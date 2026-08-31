@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block title %}Terms & Conditions — Spendly{% endblock %}
+
+{% block content %}
+
+<section class="legal-section">
+    <h1 class="legal-title">Terms &amp; Conditions</h1>
+    <p class="legal-updated">Last updated: August 31, 2026</p>
+
+    <p>Welcome to Spendly. By creating an account or using our expense-tracking service, you agree to be bound by these Terms &amp; Conditions. If you do not agree, please do not use the service.</p>
+
+    <h2>1. Description of Service</h2>
+    <p>Spendly is a personal finance tool that allows you to log, categorize, and review your expenses. The service is provided for personal, non-commercial use.</p>
+
+    <h2>2. Your Account</h2>
+    <p>You are responsible for maintaining the confidentiality of your account credentials and for all activity under your account. Notify us immediately if you suspect unauthorized access.</p>
+
+    <h2>3. Accuracy of Data</h2>
+    <p>The expense data you enter is self-reported. Spendly does not verify the accuracy of the amounts, categories, or descriptions you provide, and is not responsible for decisions made based on that data.</p>
+
+    <h2>4. Acceptable Use</h2>
+    <ul>
+        <li>Do not use the service for unlawful purposes.</li>
+        <li>Do not attempt to gain unauthorized access to other accounts or systems.</li>
+        <li>Do not interfere with or disrupt the service's operation.</li>
+    </ul>
+
+    <h2>5. Data &amp; Privacy</h2>
+    <p>Your use of the service is also governed by our <a href="{{ url_for('privacy') }}">Privacy Policy</a>, which explains what data we collect and how it is used.</p>
+
+    <h2>6. Disclaimer of Warranties</h2>
+    <p>Spendly is provided "as is" without warranties of any kind. We do not guarantee the service will be uninterrupted, error-free, or suitable for financial or tax advice.</p>
+
+    <h2>7. Limitation of Liability</h2>
+    <p>To the fullest extent permitted by law, Spendly is not liable for any indirect, incidental, or consequential damages arising from your use of the service.</p>
+
+    <h2>8. Changes to These Terms</h2>
+    <p>We may update these Terms from time to time. Continued use of the service after changes take effect constitutes acceptance of the revised Terms.</p>
+
+    <h2>9. Contact</h2>
+    <p>Questions about these Terms can be sent to our support team through the contact details listed on our website.</p>
+</section>
+
+{% endblock %}
