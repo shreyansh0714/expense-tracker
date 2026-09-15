@@ -102,7 +102,7 @@ No lint/format tooling is configured — don't assume `black`/`flake8`/`ruff` ar
 
 - **Do not implement a stub route or function unless the active task explicitly asks for it.** Jumping ahead to a later Step breaks the incremental-learning structure of this project.
 - **Never bypass `database/db.py`.** No inline `sqlite3.connect()` calls in `app.py` or elsewhere.
-- No `database.db` SQLite file exists yet — it's created by `init_db()`, which hasn't been written yet. `database/db.py` currently has no working code, only comments describing what to build — don't assume `get_db`/`init_db`/`seed_db` exist until the step that implements them.
+- `database/db.py` is implemented (`get_db`/`init_db`/`seed_db`, `users`/`expenses` tables) — `init_db()` and `seed_db()` run at app startup in `app.py`, creating `database.db` if it doesn't exist.
 - **SQLite foreign keys are off by default** — `get_db()` must run `PRAGMA foreign_keys = ON` on every connection it returns.
 - `app.run(debug=True, port=5001)` — debug mode is on, and the app runs on **port 5001**, not Flask's default 5000; don't change either. Treat any code path as visible in tracebacks — don't hardcode secrets into `app.py`.
 - Passwords must go through Werkzeug's hashing helpers once auth is implemented — never store or compare plaintext passwords.
@@ -128,6 +128,6 @@ No lint/format tooling is configured — don't assume `black`/`flake8`/`ruff` ar
 | `GET /expenses/add` | Stub — Step 7 |
 | `GET /expenses/<id>/edit` | Stub — Step 8 |
 | `GET /expenses/<id>/delete` | Stub — Step 9 |
-| `database/db.py` (`get_db`, `init_db`, `seed_db`) | Stub — Step 1 |
+| `database/db.py` (`get_db`, `init_db`, `seed_db`) | Implemented — Step 1 (`users`/`expenses` tables, `PRAGMA foreign_keys = ON`, demo seed data) |
 
 **Do not implement a stub route unless the active task explicitly asks for that step.**
