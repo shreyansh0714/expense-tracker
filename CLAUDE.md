@@ -65,6 +65,17 @@ Only what's already in `requirements.txt` — don't add new dependencies without
 
 **Tech constraints**: Flask only (no FastAPI/Django) · SQLite only (no Postgres, no ORM) · vanilla JS only (no React, no jQuery, no npm packages) · no new pip packages unless explicitly told otherwise.
 
+## Custom slash commands (`.claude/commands/*.md`)
+
+- A `` ```! `` block (or inline `` !`command` ``) runs **automatically before Claude is even involved, with no permission prompt** — it's dynamic-context injection, meant only for read-only lookups (a `git diff`, a `SELECT` query), never for anything that mutates state.
+- Any command that writes data (`INSERT`/`UPDATE`/`DELETE`, file writes, etc.) must NOT put that action in a `!` block. Instead, write the script in a plain fenced code block and instruct Claude to run it itself via its own Bash tool call — so it goes through normal tool permissions like any other write.
+- See `.claude/commands/seed-expense.md` for the pattern: the read-only `SELECT id, name, email FROM users` list uses `` !`sqlite3 ...` ``, while the `INSERT INTO expenses` script is a plain ` ```bash ` block Claude is told to run itself.
+
+## Verification hygiene
+
+- If Claude runs a command that writes data (`database.db`, or any file) to verify it works — rather than the user invoking it themselves — Claude must tell the user it did this, since it produces real rows/files indistinguishable from the user's own.
+- Claude must then clean up whatever that verification run created (delete the test rows/files) before finishing the task, not leave them for the user to discover later.
+
 ## Subagent policy
 
 - Use a built-in `Explore` subagent for codebase exploration before implementing any non-trivial new feature.
@@ -97,11 +108,13 @@ No lint/format tooling is configured — don't assume `black`/`flake8`/`ruff` ar
 - Passwords must go through Werkzeug's hashing helpers once auth is implemented — never store or compare plaintext passwords.
 - Keep route logic in `app.py` thin; don't scatter data-access code across templates or static JS.
 - Once a stub route's step is implemented, it should render a template — don't leave it returning a raw string.
+- After implementing and verifying a stubbed feature, **ask the user** whether to update the "Implemented vs stub routes" table below — don't edit it unprompted, don't skip asking.
 
 ## Implemented vs stub routes
 
-<!-- Keep this table current whenever a stub is implemented or a new route is added.
-     It's the fastest way to know what's safe to build on vs. what's intentionally unfinished. -->
+<!-- This table is the fastest way to know what's safe to build on vs. what's intentionally unfinished.
+     After implementing AND verifying a stubbed feature, ASK the user whether to update this table —
+     never edit it unprompted, and never leave it silently stale either. -->
 
 | Route | Status |
 |---|---|
