@@ -83,6 +83,12 @@ Only what's already in `requirements.txt` — don't add new dependencies without
 - When asked to plan, delegate codebase research to a subagent before presenting the plan.
 - Use the built-in `Plan` subagent when working in plan mode.
 
+## Plan checklists
+
+- Every implementation plan (Plan Mode output, or a plan written under `.claude/plans/`) must include a literal `- [ ]` checklist of concrete steps, not just prose — this is the drift guard so progress survives a mid-task compaction or context reset: re-reading the plan file tells you exactly what's done vs. pending without re-deriving it from a diff.
+- Check boxes off as each step is *actually* completed, not in advance.
+- Once implementation finishes, leave the checklist in place (all boxes checked) rather than deleting it — it doubles as a record of what was done, matching the pattern in `.claude/plans/01-database-setup.md` and `.claude/plans/03-login-and-logout.md`.
+
 ## Commands
 
 Run from `expense-tracker/` with the venv active:
@@ -119,11 +125,11 @@ No lint/format tooling is configured — don't assume `black`/`flake8`/`ruff` ar
 | Route | Status |
 |---|---|
 | `GET /` | Implemented — renders `landing.html` |
-| `GET /register` | Implemented — renders `register.html` (GET only, no POST handler) |
-| `GET /login` | Implemented — renders `login.html` (GET only, no POST handler) |
+| `GET/POST /register` | Implemented — renders `register.html`, POST creates a user and starts a session |
+| `GET/POST /login` | Implemented — renders `login.html`, POST verifies email/password and starts a session |
 | `GET /terms` | Implemented — renders `terms.html` |
 | `GET /privacy` | Implemented — renders `privacy.html` |
-| `GET /logout` | Stub — Step 3 |
+| `GET /logout` | Implemented — clears session, redirects to `landing` |
 | `GET /profile` | Stub — Step 4 |
 | `GET /expenses/add` | Stub — Step 7 |
 | `GET /expenses/<id>/edit` | Stub — Step 8 |
