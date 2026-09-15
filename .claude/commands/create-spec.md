@@ -199,3 +199,23 @@ Then tell the user to review the spec file, then enter Plan Mode
 this command dozens of times across a project. A fixed, scannable format
 means you can tell at a glance what just happened without re-reading
 prose each time.
+
+## Convention — pairing a plan with the spec
+
+Every numbered spec in `.claude/specs/` is expected to get a matching
+numbered plan in `.claude/plans/NN-<slug>.md` once Plan Mode produces
+one (see `.claude/plans/01-database-setup.md` for the shape: Context/
+Scope, a section per file changed, a Verification section tied to the
+spec's End-to-End Verification, and an Explicitly-out-of-scope
+section). This command only writes the spec — it doesn't create the
+plan file itself, since planning happens later in Plan Mode — but when
+guiding the user afterward, mention that the plan produced by Plan
+Mode should end up committed at `.claude/plans/NN-<slug>.md` using the
+same number as the spec, not left only as a local Plan Mode scratch
+file.
+
+**Why:** the spec documents *what* and *why*; the plan documents *how*
+it was actually broken into edits, and pairing the two numbers makes
+both easy to find together later. Without this note it's easy to
+finish planning and skip committing the plan, since Plan Mode's own
+output file lives outside the repo by default.
