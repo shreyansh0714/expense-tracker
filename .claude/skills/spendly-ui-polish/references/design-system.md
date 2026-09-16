@@ -14,6 +14,16 @@ markup for pages already polished under the old system (none yet
 shipped) gets updated in the next implementation pass, not retroactively
 by this edit.
 
+**Updated again 2026-09-17** after a Phase F mockup
+(https://claude.ai/artifact/6tKfNrS2cKZddUUBzVqn3g) applied this system
+to the profile page and the developer approved it. Two things that were
+previously left open are now locked in: the hand-drawn border recipe
+(SVG `feTurbulence`/`feDisplacementMap`, see "Card/table treatment"
+below) and a richer page-crumple recipe with visible fold lines (see
+"Page-level foundation" below). One correction from the mockup review:
+the Notes-card sticky note uses `--font-type` (typewriter), not
+`--font-hand` — see "Sticky note" and "Typography rules" below.
+
 ## Reuse existing tokens — never replace them
 
 `static/css/style.css` already defines `--ink`, `--paper`, `--paper-card`,
@@ -62,12 +72,32 @@ large piece of paper.** Apply grain, crease, and the aged-paper filter
 **once, to the page background**, not per card:
 
 ```css
+--crease:
+    linear-gradient(114deg, rgba(255,255,255,.55) 0%, transparent 9%, transparent 21%, rgba(20,15,8,.07) 27%, transparent 35%, transparent 58%, rgba(255,255,255,.4) 65%, transparent 74%),
+    linear-gradient(32deg, transparent 38%, rgba(20,15,8,.05) 47%, transparent 55%, transparent 80%, rgba(255,255,255,.3) 87%, transparent 95%),
+    linear-gradient(160deg, transparent 8%, rgba(20,15,8,.06) 17%, transparent 27%, transparent 58%, rgba(255,255,255,.32) 68%, transparent 80%),
+    linear-gradient(68deg, transparent 12%, rgba(255,255,255,.28) 21%, transparent 31%, transparent 63%, rgba(20,15,8,.05) 73%, transparent 85%),
+    radial-gradient(ellipse 55% 38% at 18% 14%, rgba(20,15,8,.06), transparent 70%),
+    radial-gradient(ellipse 48% 34% at 82% 72%, rgba(255,255,255,.24), transparent 70%),
+    radial-gradient(ellipse 40% 30% at 55% 92%, rgba(20,15,8,.05), transparent 72%);
+
+/* visible fold lines, layered under the grain — this is what makes it
+   read as a folded sheet instead of just soft shading */
+--crease-lines:
+    linear-gradient(114deg, transparent calc(27% - 1px), rgba(20,15,8,.16) 27%, transparent calc(27% + 1px)),
+    linear-gradient(32deg, transparent calc(53% - 1px), rgba(20,15,8,.12) 53%, transparent calc(53% + 1px)),
+    linear-gradient(160deg, transparent calc(17% - 1px), rgba(20,15,8,.14) 17%, transparent calc(17% + 1px)),
+    linear-gradient(68deg, transparent calc(64% - 1px), rgba(20,15,8,.1) 64%, transparent calc(64% + 1px)),
+    linear-gradient(48deg, transparent calc(80% - 1px), rgba(20,15,8,.09) 80%, transparent calc(80% + 1px));
+```
+
+```css
 body {
     background-color: var(--paper);
-    background-image: var(--crease);
-    background-blend-mode: multiply;
+    background-image: var(--crease), var(--crease-lines);
+    background-blend-mode: multiply, multiply;
     position: relative;
-    filter: contrast(1.03) saturate(.93);
+    filter: contrast(1.05) saturate(.9);
 }
 
 body::after {
@@ -91,6 +121,12 @@ card should carry its own `--grain`/`--crease` background or its own
 `contrast()/saturate()` filter stack anymore — that texture now lives in
 exactly one place.
 
+**Scope this to the page being polished, not `body` globally**, unless a
+future task explicitly asks for the site-wide look. Apply it to that
+page's top-level section wrapper (e.g. `.profile-section`) instead of
+the real `<body>` element, so pages that haven't been through this
+system yet (landing, auth, legal pages) aren't silently reskinned.
+
 ## Card/table treatment — hand-drawn, not torn-edge stacking
 
 Cards and tables no longer get a torn-edge `clip-path` — that was the
@@ -99,20 +135,52 @@ reads as something *drawn on* the page: a hand-drawn (slightly
 irregular, sketchy) border in place of a crisp, machine-perfect
 rectangle.
 
-**Concrete recipe: not locked yet — pick one during the Phase F mockup
-pass, don't guess here.** Two candidate techniques:
-1. An SVG `feTurbulence` + `feDisplacementMap` filter distorting a clean
-   rectangular border/outline into a hand-drawn-looking one.
-2. Two or three layered elements at slightly different `border-radius`
-   values and a few degrees of `rotate`, stacked so their edges peek out
-   unevenly from behind each other — cheaper than an SVG filter, no
-   filter performance cost, but reads as less convincingly "drawn."
+**Concrete recipe, locked from the approved Phase F mockup:** an SVG
+`feTurbulence` + `feDisplacementMap` filter, applied to a separate `<svg>`
+outline layer positioned behind the card's content — not to the card
+element itself, so only the border distorts and the text inside stays
+crisp.
 
-Whichever gets picked applies uniformly to every content panel and table
-in this system (stat tiles, the transactions table, the by-category
-card, etc.) — there's no longer a "torn top" vs. "torn both" vs. "kraft"
-distinction between component types. One hand-drawn border style, used
-everywhere a card needs an edge.
+```html
+<!-- once per page: the filter definition -->
+<svg width="0" height="0" style="position:absolute">
+  <filter id="hand-drawn" x="-6%" y="-25%" width="112%" height="150%">
+    <feTurbulence type="fractalNoise" baseFrequency="0.018" numOctaves="3" seed="7" result="noise"/>
+    <feDisplacementMap in="SourceGraphic" in2="noise" scale="7"/>
+  </filter>
+</svg>
+
+<!-- per card: wrapper is position:relative; svg outline sits behind the content -->
+<div class="hand-card">
+  <svg class="hand-card-outline" preserveAspectRatio="none">
+    <rect x="1.5%" y="5%" width="97%" height="88%" rx="8" fill="none"
+          stroke="var(--ink)" stroke-width="1.5" filter="url(#hand-drawn)"/>
+  </svg>
+  <div class="hand-card-content"><!-- real content, unfiltered --></div>
+</div>
+```
+
+```css
+.hand-card { position: relative; }
+.hand-card-outline {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    pointer-events: none;
+}
+.hand-card-content {
+    position: relative; z-index: 1;
+    background: rgba(255, 255, 255, .8);
+    border-radius: 8px;
+}
+```
+
+Give each card a slight individual `rotate` (±0.3–0.6deg) on the outer
+`.hand-card` wrapper — small, varied per card, never uniform — so cards
+read as independently hand-placed rather than machine-aligned. Applies
+uniformly to every content panel and table in this system (stat tiles,
+the transactions table, the by-category card, etc.) — there's no longer
+a "torn top" vs. "torn both" vs. "kraft" distinction between component
+types. One hand-drawn border style, used everywhere a card needs an
+edge.
 
 ## Shape treatments — revised table
 
@@ -140,6 +208,24 @@ and rotate a few degrees off-axis for a hand-placed feel — this
 positioning detail is unchanged from before. What changed is *when*
 they're used at all, not how they're drawn.
 
+**A sticky note can attach directly to the corner of the card it's
+about**, rather than sitting as its own freestanding block — this is the
+clearest possible expression of "stuck to the page for reference."
+Locked example from the approved mockup: the profile page's Notes-to-self
+sticky note is absolutely positioned at the top-right corner of the
+header/avatar card, overlapping it slightly, rotated a few degrees, its
+own tape strip pinning it down:
+
+```css
+.header-card { position: relative; } /* the card being attached to */
+.notes-sticky {
+    position: absolute;
+    top: -22px; right: -16px;
+    z-index: 3;
+    transform: rotate(-4deg);
+}
+```
+
 ## Sticky note — reminder/"note to self" content only
 
 Reserved specifically for content the user wrote as a reminder to
@@ -149,9 +235,33 @@ reference case for this treatment going forward. Visual treatment is
 unchanged from the original system: **no torn edge** — clean rounded
 rectangle (`border-radius: 10px`), pastel background (`--sticky` /
 `--sticky-mint`), its own drop shadow, a small tape strip pinning it
-down, `--font-hand` for its content. Never apply this treatment to
-anything that isn't reminder/note content — a stat tile or a data table
-is never a sticky note, no matter how small.
+down. Never apply this treatment to anything that isn't reminder/note
+content — a stat tile or a data table is never a sticky note, no matter
+how small.
+
+**Content font, corrected from the original moodboard:** `--font-type`
+(typewriter), not `--font-hand`. The developer's explicit call on the
+real Notes card — logged/typed reminders read better in the app's
+printed-content voice than in a script face; `--font-hand` stays
+reserved for a genuinely handwritten-feel use case if one comes up
+later, it's just not this one.
+
+**Small-by-default, expands to edit:** when the sticky note wraps a real
+editable field (not just static reminder text), keep it small at rest
+and let it grow on interaction — pure CSS, no JS:
+
+```css
+.notes-sticky {
+    width: 205px; height: 92px;
+    overflow: hidden;
+    transition: width .25s ease, height .25s ease, transform .25s ease;
+}
+.notes-sticky:focus-within {
+    width: 380px; height: 220px;
+    transform: rotate(0deg);
+    z-index: 50;
+}
+```
 
 ## Motion — one orchestrated pattern, don't add more
 
@@ -168,11 +278,13 @@ is never a sticky note, no matter how small.
 - `DM Sans` → all regular UI text, labels, buttons — unchanged from
   existing site usage.
 - `Special Elite` → printed/receipt content only (amounts, itemized rows,
-  small uppercase tag chips). Never headings, never buttons.
-- `Caveat` → handwritten-feel microcopy only: sticky notes, small margin
-  annotations or helper text under a form field. Never primary content —
-  it must always supplement real text elsewhere, never be the only copy of
-  a piece of information (accessibility: script fonts are harder to read).
+  small uppercase tag chips), **and sticky-note/reminder content** like
+  the Notes card — logged reminders read as typed entries in this app,
+  not handwriting. Never headings, never buttons.
+- `Caveat` → reserved, currently unused. Was originally assigned to
+  sticky-note content; corrected 2026-09-17 (see "Sticky note" above) —
+  kept declared in `:root` for a genuinely handwritten-feel use case if
+  one comes up later, not applied anywhere today.
 
 ## What this skill should never do
 
