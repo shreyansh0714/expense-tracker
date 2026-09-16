@@ -1,8 +1,18 @@
 # Spendly paper-and-receipt design system
 
-Source of truth for everything `spendly-ui-polish` applies. Locked from the
-approved prototype: https://claude.ai/artifact/MJjs9Ed2iJcumWmXRyLDdw
-("Spendly Paper Ledger" moodboard, final version).
+Source of truth for everything `spendly-ui-polish` applies. Originally
+locked from the approved prototype:
+https://claude.ai/artifact/MJjs9Ed2iJcumWmXRyLDdw ("Spendly Paper
+Ledger" moodboard). **Revised 2026-09-17** after the developer flagged a
+real mistake in the first version of this system: it applied paper
+textures *per card* (each card independently got its own grain, crease,
+torn edge, and often a tape or pin), so a page read as a small pile of
+separately-decorated paper scraps sitting next to each other — closer to
+the moodboard's literal look than to the actual intent. See "Page-level
+foundation" below for the fix. This revision is doc-only — the CSS/
+markup for pages already polished under the old system (none yet
+shipped) gets updated in the next implementation pass, not retroactively
+by this edit.
 
 ## Reuse existing tokens — never replace them
 
@@ -14,11 +24,16 @@ approved prototype: https://claude.ai/artifact/MJjs9Ed2iJcumWmXRyLDdw
 `--accent`, `--accent-2`, or `--danger`, and never introduces a second,
 competing color system.
 
-## New tokens to add to `:root`
+## Design system tokens (all present in `:root`)
 
 ```css
---paper-stack-1: #e8e2d3;   /* stacked-sheet effect, layer 1 */
---paper-stack-2: #dcd4c0;   /* stacked-sheet effect, layer 2 */
+--paper-stack-1: #e8e2d3;   /* currently unused — the "paper-stack depth"
+                                technique it supported was for extra
+                                dimension behind a torn card; torn edges
+                                on individual cards are retired by this
+                                revision. Tracked in PROGRESS.md for
+                                Phase F cleanup, not removed here. */
+--paper-stack-2: #dcd4c0;   /* same as above */
 --kraft: #e9dcc0;           /* index-card / kraft surfaces */
 --kraft-line: #c9b98f;
 --sticky: #f3e28f;          /* pastel yellow sticky note */
@@ -36,78 +51,107 @@ Add `Special Elite` and `Caveat` to the Google Fonts `<link>` in
 the first time either font is needed on a page. Don't add fonts nothing on
 the page uses.
 
-## Core textures — apply to every "paper" surface
+## Page-level foundation — one sheet, not a stack of separately-decorated cards
 
-1. **Grain** — a tiled SVG-noise overlay, `mix-blend-mode: multiply`,
-   opacity ~0.5, via a pseudo-element so it never blocks clicks/inputs:
-   ```css
-   --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-   ```
-   ```css
-   .sheet::after {
-     content: "";
-     position: absolute;
-     inset: 0;
-     border-radius: inherit;
-     background-image: var(--grain);
-     background-size: 140px 140px;
-     mix-blend-mode: multiply;
-     opacity: .5;
-     pointer-events: none;
-   }
-   ```
-2. **Crease/crumple** — two diagonal `linear-gradient`s (light/dark bands)
-   as a second `background-image` layer, `background-blend-mode: multiply`,
-   faking fold highlights/shadows with no actual geometry distortion:
-   ```css
-   --crease:
-     linear-gradient(114deg, rgba(255,255,255,.55) 0%, transparent 9%, transparent 21%, rgba(20,15,8,.07) 27%, transparent 35%, transparent 58%, rgba(255,255,255,.4) 65%, transparent 74%),
-     linear-gradient(32deg, transparent 38%, rgba(20,15,8,.05) 47%, transparent 55%, transparent 80%, rgba(255,255,255,.3) 87%, transparent 95%);
-   ```
-   Apply as `background-image: var(--crease);` with
-   `background-blend-mode: multiply, multiply;` alongside the surface's own
-   `background-color` (never the `background:` shorthand, which would wipe
-   the image out).
-3. **Aged-paper filter** — stack `contrast(1.03) saturate(.93)` onto
-   whatever `filter: drop-shadow(...)` the card already uses for its lift.
+This is the philosophy fix. Previously, grain + crease + the aged-paper
+filter were applied per card, and each card could also get its own torn
+edge plus a tape or pin. The result was several small, independently
+"papered" rectangles next to each other — a stack, not a sheet. The
+actual intent is simpler and more literal: **the entire page is one
+large piece of paper.** Apply grain, crease, and the aged-paper filter
+**once, to the page background**, not per card:
 
-## Shape treatments — pick one per component, never mix on one element
+```css
+body {
+    background-color: var(--paper);
+    background-image: var(--crease);
+    background-blend-mode: multiply;
+    position: relative;
+    filter: contrast(1.03) saturate(.93);
+}
+
+body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background-image: var(--grain);
+    background-size: 140px 140px;
+    mix-blend-mode: multiply;
+    opacity: .5;
+    pointer-events: none;
+    z-index: 1;
+}
+```
+
+(`pointer-events: none` on the grain overlay keeps it from ever blocking
+clicks/inputs.) Cards sitting on top of this background read as things
+*drawn on* the sheet — plain content regions with a hand-drawn border
+(below), not their own separately-textured paper scraps. No individual
+card should carry its own `--grain`/`--crease` background or its own
+`contrast()/saturate()` filter stack anymore — that texture now lives in
+exactly one place.
+
+## Card/table treatment — hand-drawn, not torn-edge stacking
+
+Cards and tables no longer get a torn-edge `clip-path` — that was the
+per-card "paper scrap" signature this revision retires. Instead, a card
+reads as something *drawn on* the page: a hand-drawn (slightly
+irregular, sketchy) border in place of a crisp, machine-perfect
+rectangle.
+
+**Concrete recipe: not locked yet — pick one during the Phase F mockup
+pass, don't guess here.** Two candidate techniques:
+1. An SVG `feTurbulence` + `feDisplacementMap` filter distorting a clean
+   rectangular border/outline into a hand-drawn-looking one.
+2. Two or three layered elements at slightly different `border-radius`
+   values and a few degrees of `rotate`, stacked so their edges peek out
+   unevenly from behind each other — cheaper than an SVG filter, no
+   filter performance cost, but reads as less convincingly "drawn."
+
+Whichever gets picked applies uniformly to every content panel and table
+in this system (stat tiles, the transactions table, the by-category
+card, etc.) — there's no longer a "torn top" vs. "torn both" vs. "kraft"
+distinction between component types. One hand-drawn border style, used
+everywhere a card needs an edge.
+
+## Shape treatments — revised table
 
 | Component pattern | Treatment |
 |---|---|
-| Content panel (stat tiles, dashboard cards) | Torn top edge only (jagged top, flat bottom) + tape **or** pin decoration — alternate which, never both on one card |
-| Printed/transactional strip (expense list, receipt, any itemized total) | Torn **both** top and bottom (like a cut receipt) + `--font-type` for rows/amounts, `font-variant-numeric: tabular-nums` |
-| Editable form panel | Torn top edge, kraft background (`--kraft`), small coral "✎ editable" tag next to the title, a small circular "hole-punch" dot near the top |
-| Reference/notes card | Torn top edge + ruled-notebook line background + italic serif card title |
-| Sticky note / reminder | **No torn edge** — clean rounded rectangle (`border-radius: 10px`), pastel background (`--sticky` / `--sticky-mint`), own drop shadow, small tape strip, `--font-hand` content only |
+| Content panel (stat tiles, dashboard cards, tables) | Hand-drawn border (see above). No torn edge, no per-card grain/crease/filter — those now live at the page level only. |
+| Editable form panel | Same hand-drawn border. No kraft background and no coral "editable" tag — those were per-card-paper-scrap signifiers, retired along with torn edges. A form is just a card with a hand-drawn border like any other. |
+| Reference/notes card | Hand-drawn border + ruled-notebook line background + italic serif card title. The ruled-line texture is the one per-card interior texture that survives this revision — it signals "this is a page from a notebook," which is a real, specific meaning, not generic paper decoration. |
+| Reminder callout (sticky note) | See "Sticky note" below — the one place tape/pin styling still applies. |
 
-**Torn-top clip-path** (jag amplitude in `px`, not `%`, so it stays
-constant regardless of card height):
-```css
-clip-path: polygon(
-  0% 6px, 7% 0px, 14% 9px, 21% 2px, 29% 7px, 36% 0px, 43% 8px, 50% 3px,
-  57% 9px, 64% 1px, 71% 7px, 79% 0px, 86% 8px, 93% 2px, 100% 6px,
-  100% 100%, 0% 100%
-);
-```
-For **torn-both** (receipt-style), mirror the same jag onto the bottom edge
-using `calc(100% - Npx)` for the y-values instead of `100%`.
+## Tape and pin — reserved for "this is physically stuck to the page," not decoration
 
-**Ruled-notebook background** (for reference/notes cards):
-```css
-background-image: repeating-linear-gradient(to bottom, transparent 0 27px, var(--ruled-line) 27px 28px);
-```
+Previously tape/pin appeared on most cards as a generic decorative
+flourish (alternating tape-or-pin per card, per the old table). That's
+retired. Tape and pin now mean one specific thing: *this piece of
+content has been physically stuck onto the page for quick reference* —
+the way someone pastes a real sticky note onto a real piece of paper to
+flag something to check later. If a card isn't that kind of reminder/
+reference content, it gets no tape and no pin at all. On most pages,
+most cards will have neither.
 
-**Tape** and **pin** decorations sit just above the card's top edge
-(`top: -8px` to `-11px`, absolutely positioned), gold-toned
-(`var(--gold)`/`var(--gold-dark)`), and rotate a few degrees off-axis for a
-hand-placed feel. Never put both on the same card — pick one.
+**Tape** and **pin** decorations, when used, sit just above the card's
+top edge (`top: -8px` to `-11px`, absolutely positioned), gold-toned,
+and rotate a few degrees off-axis for a hand-placed feel — this
+positioning detail is unchanged from before. What changed is *when*
+they're used at all, not how they're drawn.
 
-**Paper-stack depth** (optional, for extra dimension behind a torn card):
-two `::before`/`::after` pseudo-elements on the card's wrapper, offset a
-few px and rotated slightly more/less than the card itself, colored
-`--paper-stack-1` / `--paper-stack-2`, sitting behind it — mimics a couple
-of sheets underneath the top one. Skip this for sticky notes.
+## Sticky note — reminder/"note to self" content only
+
+Reserved specifically for content the user wrote as a reminder to
+themselves. A "notes to self" field is the canonical example — Spendly's
+profile page Notes card is exactly this kind of content, and is the
+reference case for this treatment going forward. Visual treatment is
+unchanged from the original system: **no torn edge** — clean rounded
+rectangle (`border-radius: 10px`), pastel background (`--sticky` /
+`--sticky-mint`), its own drop shadow, a small tape strip pinning it
+down, `--font-hand` for its content. Never apply this treatment to
+anything that isn't reminder/note content — a stat tile or a data table
+is never a sticky note, no matter how small.
 
 ## Motion — one orchestrated pattern, don't add more
 
@@ -133,8 +177,12 @@ of sheets underneath the top one. Skip this for sticky notes.
 ## What this skill should never do
 
 - Invent new page sections, fields, or copy — polish what's already there.
-- Put torn edges on sticky notes, or ruled-notebook lines on anything that
-  isn't a reference/notes card.
+- Apply grain, crease, or the aged-paper filter to an individual card —
+  that texture lives at the page level only now, not per component.
+- Give a card a torn edge — retired system-wide by this revision.
+- Add tape or a pin to a card that isn't genuinely reminder/reference
+  content stuck onto the page for quick lookup — most cards get neither.
+- Put ruled-notebook lines on anything that isn't a reference/notes card.
 - Touch `--accent`, `--accent-2`, `--danger`, or any existing token —
   extend the palette, never replace a value already in use elsewhere.
 - Add a dependency, build step, or JS framework — vanilla CSS/HTML/JS only.
@@ -147,7 +195,7 @@ of sheets underneath the top one. Skip this for sticky notes.
   calculation exists in this app), and the two "Pinned" sticky notes
   ("Beautify only — CSS + markup polish...", "Read the spec first. Style
   second.") — those are notes-to-self about building this skill, not
-  content a real user should ever see. When a mockup shows example text,
-  pull colors/spacing/typography/treatment from it, and pull the *real*
-  page's actual content/copy from the spec or the page itself — never
-  from the mockup's placeholder text.
+  content a real user should ever see. The same rule applies to any
+  future reference image shown for style only (colors/spacing/typography/
+  treatment) — never copy its placeholder text onto a real page. Real
+  page content always comes from the spec or the page's own data.

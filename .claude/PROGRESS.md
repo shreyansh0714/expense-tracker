@@ -82,20 +82,33 @@ what changed.
       into a modal with a crumple-open animation
       (`prefers-reduced-motion`-guarded), Notes card now renders in the
       typewriter font
-- [ ] Real paper-theme visual polish (global crumpled-paper page
+- [x] Phase E: `spendly-ui-polish/references/design-system.md` (and
+      `SKILL.md`'s workflow steps) rewritten from per-card paper
+      treatments to the global-page-background/hand-drawn-border/
+      sparing-tape-pin/Notes-as-sticky-note philosophy the developer
+      described. `--sticky`/`--sticky-mint` tokens added to `:root` in
+      `style.css`, closing that previously-tracked gap.
+- [ ] Phase F: real paper-theme visual polish (global crumpled-paper page
       background, hand-drawn card/table borders, sparing tape/pin,
-      Notes-card as a sticky note) — **deliberately not done yet.**
-      Current look is plain/placeholder on purpose (category pills reuse
-      existing neutral tokens, cards are plain `.auth-card`s, no
-      torn-edge/tape/pin anywhere in the new dashboard markup) —
-      developer confirmed 2026-09-17 this is expected, not a bug: "Just
-      the plain/placeholder look... the real paper-theme visual polish
-      (Phase F) just hasn't happened yet." Next up: Phase E (rewrite
-      `spendly-ui-polish/references/design-system.md`'s per-card
-      philosophy to the global-background/hand-drawn/sparing-tape-pin
-      approach) then Phase F (a `frontend-design`-skill mockup Artifact
-      for the developer's approval, then real CSS via the revised
-      `spendly-ui-polish` skill).
+      Notes-card restyled as a sticky note per the revised doc) —
+      **deliberately not done yet.** Current look is plain/placeholder on
+      purpose (category pills reuse existing neutral tokens, cards are
+      plain `.auth-card`s, no torn-edge/tape/pin anywhere in the new
+      dashboard markup) — developer confirmed 2026-09-17 this is
+      expected, not a bug. Next up: a `frontend-design`-skill mockup
+      Artifact for the developer's approval, then real CSS via the
+      revised `spendly-ui-polish` skill.
+- [ ] Two cleanup items surfaced by the Phase E doc revision, deferred to
+      Phase F alongside the real CSS work (not done now — Phase E was
+      doc-only):
+      - `--paper-stack-1`/`--paper-stack-2` tokens in `style.css` are now
+        unused — the "paper-stack depth" technique they supported needed
+        a torn card edge to sit behind, and individual-card torn edges
+        are retired by the revision.
+      - The Notes card's actual CSS (`.paper-card.notes-card.torn-top` +
+        a tape strip) still reflects the *old* per-card system — the
+        revised doc's sticky-note rule says no torn edge. Real markup/CSS
+        alignment happens in Phase F, not yet.
 - [ ] Live-browser verification of the modal open/close, the crumple
       animation, `prefers-reduced-motion` behavior, and the
       email-verification modal triggering correctly from inside the new
@@ -135,8 +148,6 @@ against the live code.
 | Area | Issue | Kind |
 |---|---|---|
 | Profile page (`app.py:135`) | Monthly budget renders in scientific notation for values ≥ ₹1,000,000 (Python's `:g` format switches to exponent form, e.g. `1e+06`) — a real display bug | Bug |
-| Profile page (`templates/profile.html`) | Recent-activity card has a pin decoration not called for by `design-system.md`'s component table (that entry only specifies torn-both + typewriter font + tabular-nums) | Doc/treatment mismatch |
-| Profile page (`static/css/style.css`) | `--sticky` / `--sticky-mint` tokens from `design-system.md` were never added to `:root` — harmless today since no page uses the sticky-note treatment yet | Incomplete token set |
 | Profile page (`static/css/style.css`) | `.profile-card-title` applies italic to *every* card title, but `design-system.md`'s table only specifies italic for the reference/notes card specifically — may be an intentional broader reading of the Typography section, needs a judgment call | Needs a decision |
 | `spendly-ui-polish` skill | The 3 saved eval prompts (`evals/evals.json`) have never actually been run — no results/workspace exist | Unverified |
 | Profile page (Step 5 dashboard/modal) | Modal open/close, the crumple-open animation, `prefers-reduced-motion` behavior, and the nested email-verification-modal-from-inside-the-edit-modal flow are only verified via code review + Flask test-client checks — never exercised in a real browser (Playwright's browser profile was locked all session) | Unverified |
