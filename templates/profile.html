@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+
+{% block title %}Profile — Spendly{% endblock %}
+
+{% block content %}
+
+<section class="profile-section">
+
+    <div class="profile-header">
+        <h1 class="profile-title">Your account</h1>
+        <p class="profile-member-since">Member since {{ member_since }}</p>
+    </div>
+
+    {% if error %}
+    <div class="auth-error profile-error">{{ error }}</div>
+    {% endif %}
+
+    <div class="profile-grid">
+
+        <div class="profile-insights">
+
+            <div class="auth-card paper-card torn-top">
+                <div class="paper-tape left"></div>
+                <h2 class="profile-card-title">Overview</h2>
+                <div class="profile-summary-row">
+                    <span>Total spent</span>
+                    <span class="profile-summary-total">₹{{ "%.2f"|format(monthly_total) }}</span>
+                </div>
+                {% if budget_amount is not none %}
+                <p class="profile-budget-line">₹{{ "%.2f"|format(monthly_total) }} of ₹{{ "%.2f"|format(budget_amount) }} budget used</p>
+                {% endif %}
+                {% if category_totals %}
+                    {% for row in category_totals %}
+                    <div class="category-row">
+                        <span>{{ row.category }}</span>
+                        <span>₹{{ "%.2f"|format(row.total) }}</span>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                <p class="profile-empty-state">No expenses logged this month yet.</p>
+                {% endif %}
+            </div>
+
+            <div class="auth-card paper-card torn-both">
+                <div class="paper-pin"></div>
+                <h2 class="profile-card-title">Recent activity</h2>
+                {% if recent_expenses %}
+                    {% for expense in recent_expenses %}
+                    <div class="activity-row">
+                        <span>{{ expense.category }} <span class="activity-row-meta">— {{ expense.date }}</span></span>
+                        <span>₹{{ "%.2f"|format(expense.amount) }}</span>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                <p class="profile-empty-state">No expenses logged yet.</p>
+                {% endif %}
+            </div>
+
+            <div class="auth-card paper-card notes-card torn-top">
+                <div class="paper-tape right"></div>
+                <h2 class="profile-card-title">Notes to self</h2>
+                <textarea name="notes" form="profile-form" class="form-input" maxlength="2000"
+                          placeholder="Personal reminders, budgeting notes...">{{ notes }}</textarea>
+            </div>
+
+        </div>
+
+        <div class="profile-form-column">
+            <div class="auth-card paper-card kraft torn-top">
+                <div class="paper-pin"></div>
+                <div class="paper-hole"></div>
+                <div class="paper-card-header">
+                    <h2 class="profile-card-title">Edit profile</h2>
+                    <span class="pencil-tag">&#9998; editable</span>
+                </div>
+                <form method="POST" action="{{ url_for('profile') }}" id="profile-form">
+                    <div class="form-group">
+                        <label for="name">Full name</label>
+                        <input type="text" id="name" name="name"
+                               class="form-input" value="{{ name }}" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="email">Email address</label>
+                        <input type="email" id="email" name="email"
+                               class="form-input" value="{{ email }}"
+                               data-original-email="{{ original_email }}" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="monthly_budget">Monthly budget (₹)</label>
+                        <input type="text" id="monthly_budget" name="monthly_budget"
+                               class="form-input" value="{{ monthly_budget }}"
+                               placeholder="e.g. 15000">
+                    </div>
+                    <div class="form-group">
+                        <label for="current_password">Current password</label>
+                        <input type="password" id="current_password" name="current_password"
+                               class="form-input" placeholder="Leave blank to keep your password">
+                    </div>
+                    <div class="form-group">
+                        <label for="new_password">New password</label>
+                        <input type="password" id="new_password" name="new_password"
+                               class="form-input" placeholder="Leave blank to keep your password">
+                    </div>
+                    <div class="form-group">
+                        <label for="confirm_password">Confirm new password</label>
+                        <input type="password" id="confirm_password" name="confirm_password"
+                               class="form-input" placeholder="Repeat new password">
+                    </div>
+
+                    <input type="hidden" id="verification_code" name="verification_code" value="">
+
+                    <button type="submit" class="btn-submit">Save changes</button>
+                </form>
+            </div>
+        </div>
+
+    </div>
+
+</section>
+
+<div id="verification-modal" class="modal" hidden>
+    <div class="modal-overlay" data-modal-close></div>
+    <div class="modal-content">
+        <button type="button" class="modal-close" aria-label="Close" data-modal-close>&times;</button>
+        <div class="verification-card">
+            <h2 class="profile-card-title">Confirm your new email</h2>
+            <p class="auth-subtitle">Enter the verification code to confirm this email change.</p>
+            <div class="form-group">
+                <label for="verification-code-input">Verification code</label>
+                <input type="text" id="verification-code-input" class="form-input" autocomplete="off">
+            </div>
+            <button type="button" id="verification-confirm-btn" class="btn-submit">Confirm</button>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

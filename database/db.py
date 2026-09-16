@@ -1,5 +1,5 @@
 import sqlite3
-from datetime import date
+from datetime import date, timedelta
 from werkzeug.security import generate_password_hash
 
 DB_PATH = "database.db"
@@ -20,7 +20,9 @@ def init_db():
             name TEXT NOT NULL,
             email TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
-            created_at TEXT DEFAULT (datetime('now'))
+            created_at TEXT DEFAULT (datetime('now')),
+            monthly_budget REAL,
+            notes TEXT
         )
     """)
     conn.execute("""
@@ -35,6 +37,14 @@ def init_db():
             FOREIGN KEY (user_id) REFERENCES users(id)
         )
     """)
+    # Existing databases created before these columns existed won't have
+    # them yet; SQLite has no "ADD COLUMN IF NOT EXISTS", so add them
+    # idempotently and ignore the error when they're already there.
+    for column, coltype in (("monthly_budget", "REAL"), ("notes", "TEXT")):
+        try:
+            conn.execute(f"ALTER TABLE users ADD COLUMN {column} {coltype}")
+        except sqlite3.OperationalError:
+            pass
     conn.commit()
     conn.close()
 
@@ -93,5 +103,64 @@ def get_user_by_email(email):
         return conn.execute(
             "SELECT * FROM users WHERE email = ?", (email,)
         ).fetchone()
+    finally:
+        conn.close()
+
+
+def get_user_by_id(user_id):
+    conn = get_db()
+    try:
+        return conn.execute(
+            "SELECT * FROM users WHERE id = ?", (user_id,)
+        ).fetchone()
+    finally:
+        conn.close()
+
+
+def update_user(user_id, name, email, monthly_budget, notes, password=None):
+    conn = get_db()
+    try:
+        if password:
+            password_hash = generate_password_hash(password)
+            conn.execute(
+                "UPDATE users SET name = ?, email = ?, monthly_budget = ?, "
+                "notes = ?, password_hash = ? WHERE id = ?",
+                (name, email, monthly_budget, notes, password_hash, user_id),
+            )
+        else:
+            conn.execute(
+                "UPDATE users SET name = ?, email = ?, monthly_budget = ?, "
+                "notes = ? WHERE id = ?",
+                (name, email, monthly_budget, notes, user_id),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_monthly_category_totals(user_id):
+    conn = get_db()
+    try:
+        today = date.today()
+        month_start = today.replace(day=1)
+        month_end = (month_start + timedelta(days=32)).replace(day=1)
+        return conn.execute(
+            "SELECT category, SUM(amount) as total FROM expenses "
+            "WHERE user_id = ? AND date >= ? AND date < ? "
+            "GROUP BY category ORDER BY total DESC",
+            (user_id, month_start.isoformat(), month_end.isoformat()),
+        ).fetchall()
+    finally:
+        conn.close()
+
+
+def get_recent_expenses(user_id, limit=5):
+    conn = get_db()
+    try:
+        return conn.execute(
+            "SELECT * FROM expenses WHERE user_id = ? "
+            "ORDER BY date DESC, id DESC LIMIT ?",
+            (user_id, limit),
+        ).fetchall()
     finally:
         conn.close()

@@ -1,0 +1,23 @@
+{
+  "skill_name": "spendly-ui-polish",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Polish the login page so it matches Spendly's paper/receipt theme.",
+      "expected_output": "login.html and style.css updated: the auth-card gets the form-panel treatment (torn top edge, kraft-adjacent surface, grain/crease texture) without any new form fields, routes, or JS logic being added. app.py and database/db.py are untouched.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "The terms and privacy pages look too plain — can you beautify them to match the rest of the site?",
+      "expected_output": "terms.html/privacy.html and style.css updated: legal-section content gets a paper-appropriate treatment (e.g. reference/notes-card styling with ruled lines and italic serif headings, since it's read-only reference content, not a form or a receipt) without changing the legal copy itself.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Make the landing page's mock stats card feel more on-brand with our paper theme.",
+      "expected_output": "landing.html's mock-card/mock-stat markup and style.css updated: content-panel treatment (torn top edge + tape or pin, grain/crease) applied to the stat tiles, existing --accent/--accent-2 tokens reused rather than replaced.",
+      "files": []
+    }
+  ]
+}

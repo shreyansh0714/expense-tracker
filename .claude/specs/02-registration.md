@@ -149,22 +149,22 @@ No JSON API — this is a classic server-rendered form post, consistent with
 
 ## 8. Acceptance Criteria
 
-- [ ] `GET /register` still renders the form exactly as today (no regression).
-- [ ] `POST /register` with valid name/email/strong-password creates a new
+- [x] `GET /register` still renders the form exactly as today (no regression).
+- [x] `POST /register` with valid name/email/strong-password creates a new
       row in `users` with a hashed (not plaintext) password.
-- [ ] Successful registration sets `session["user_id"]` and redirects to
+- [x] Successful registration sets `session["user_id"]` and redirects to
       `/profile`.
-- [ ] Submitting a duplicate email re-renders `register.html` with an error
+- [x] Submitting a duplicate email re-renders `register.html` with an error
       and does not create a second row.
-- [ ] Submitting a short/weak password re-renders with an error and creates
+- [x] Submitting a short/weak password re-renders with an error and creates
       no row.
-- [ ] Submitting an empty name or malformed email re-renders with an error
+- [x] Submitting an empty name or malformed email re-renders with an error
       and creates no row.
-- [ ] `register.html`'s form `action` uses `url_for('register')`, not a
+- [x] `register.html`'s form `action` uses `url_for('register')`, not a
       hardcoded path.
-- [ ] No raw `sqlite3` calls appear in `app.py` — all DB access goes through
+- [x] No raw `sqlite3` calls appear in `app.py` — all DB access goes through
       `database/db.py`.
-- [ ] `app.secret_key` is set from an environment variable with a dev-only
+- [x] `app.secret_key` is set from an environment variable with a dev-only
       fallback, never a literal hardcoded string.
 
 ## 9. End-to-End Verification

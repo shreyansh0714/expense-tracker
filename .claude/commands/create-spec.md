@@ -141,13 +141,48 @@ below isn't competing for space with every file the exploration touched.
 
 ## Step 8 — Interview the user
 
-Use `AskUserQuestion` to nail down functional requirements, the API/data
-shape, constraints, and edge cases. Don't invent requirements the user
-hasn't stated.
+A feature name like "profile page" pulls attention toward its editable
+half by default — form fields, validation, what gets submitted — because
+that's the concrete, obvious part. Nothing forces a separate look at the
+read-only half, so it silently drops out unless you ask for it on
+purpose. Ask these as genuinely separate `AskUserQuestion` questions, not
+one blended one:
 
-**Why:** a spec is only as good as its assumptions. Guessing at a
-requirement here is how a spec quietly encodes a decision the user never
-actually made.
+1. **Mutation** — "What should the user be able to change or submit
+   here?"
+2. **Display** — "What should the user see here that they can't change —
+   summaries, history, any other read-only content?"
+
+Then, before moving on:
+
+- **Check for an existing design reference.** If a mockup, prototype,
+  Figma reference, or artifact for this feature already exists —
+  including one shown in an earlier, unrelated-seeming conversation this
+  session or a prior one — walk through it item by item with the user and
+  ask which pieces are real functional requirements versus pure
+  decoration. A reference shown once, in passing, elsewhere, must not
+  silently fail to become a requirement here.
+- **Ask the boundary question whenever a related-but-deferred feature
+  exists.** If CLAUDE.md's roadmap or Future Tasks lists something related
+  that's being built later (e.g. a Dashboard), ask explicitly: "Given
+  [related feature] is being built separately later, is there any
+  summary/at-a-glance version of that data that still belongs on *this*
+  page in the meantime?" Get that boundary settled here, not negotiated
+  reactively after the spec is already written.
+- **Close with a catch-all**, right before Step 9: "Is there anything else
+  this page should show or do that we haven't covered yet?"
+
+Across all of this: don't invent requirements the user hasn't stated.
+
+**Why:** a spec is only as good as its assumptions, and an assumption
+doesn't have to be *wrong* to be a problem — it can just be *incomplete*.
+A single blended "functional requirements" question reliably captures the
+mutation half of a feature and just as reliably misses the display half,
+because nothing about asking it makes you notice what it left out. The
+mockup check and the boundary question close the two other ways that gap
+showed up in practice: a visual reference from a different conversation
+thread never turning into a written requirement, and a deferred feature's
+boundary being decided implicitly instead of asked about.
 
 ## Step 9 — Write the spec
 
@@ -156,7 +191,7 @@ otherwise, the highest existing `NN-` prefix in `.claude/specs/` + 1,
 zero-padded to 2 digits.
 
 Write `.claude/specs/NN-<slug>.md` (your own Write tool call — never a
-`!` block) with exactly these 9 sections, in this order, each a plain
+`!` block) with exactly these 10 sections, in this order, each a plain
 `##` heading, filled with real content grounded in Steps 3, 7 and 8 — no
 placeholders:
 
@@ -170,16 +205,28 @@ placeholders:
 6. **Out of Scope** — what this feature explicitly will NOT do.
 7. **Edge Cases and Error Handling** — failure modes and how they're handled.
 8. **Acceptance Criteria** — checklist for when this is considered done.
-9. **End-to-End Verification** — a concrete, runnable step that proves the
-   feature works once implemented.
+9. **Manual Verification Guide** — the developer driving this project is a
+   beginner and does not yet know how to verify acceptance criteria on
+   their own. For *every* item in section 8, write explicit, beginner-safe,
+   step-by-step instructions for checking it by hand: exact UI paths (e.g.
+   "DevTools → Application tab → Storage → Cookies → pick the origin
+   matching your URL bar exactly"), exact commands to run (`curl`, `pytest`,
+   a `sqlite3` read-only query), and the exact expected output/result for
+   each. Assume no prior familiarity with the tool being used — this
+   section is a manual, not a hint.
+10. **End-to-End Verification** — a concrete, runnable step that proves the
+    feature works once implemented.
 
-**Why these 9 and not fewer:** sections 1, 2, 3, 5, 7 and 8 (Problem
+**Why these 10 and not fewer:** sections 1, 2, 3, 5, 7 and 8 (Problem
 Statement, Functional Requirements, APIs, Constraints, Edge Cases and
 Error Handling, Acceptance Criteria) were requested up front. Sections 4,
-6 and 9 (Files and Interfaces Involved, Out of Scope, End-to-End
+6 and 10 (Files and Interfaces Involved, Out of Scope, End-to-End
 Verification) were added after checking the official Claude Code docs —
 each closes a real gap the other 6 leave open (which files actually
 change, what's deliberately excluded, and how anyone proves it worked).
+Section 9 (Manual Verification Guide) was added later still, specifically
+because the developer here can't yet verify acceptance criteria
+unassisted — see CLAUDE.md's "Spec verification convention".
 
 ## Step 10 — Report back
 
@@ -219,3 +266,20 @@ it was actually broken into edits, and pairing the two numbers makes
 both easy to find together later. Without this note it's easy to
 finish planning and skip committing the plan, since Plan Mode's own
 output file lives outside the repo by default.
+
+## Convention — verifying the implementation (⚠️ TODO, not yet wired up)
+
+Once Plan Mode finishes implementing a spec, verifying it against that
+spec's **Acceptance Criteria** / **Manual Verification Guide** must be
+delegated to a dedicated `verify` subagent — **the main agent must never
+verify its own implementation.** This is a placeholder convention only:
+
+- No `.claude/agents/verify.md` exists yet.
+- No hook fires it automatically after an implementation plan completes.
+
+Until both of those exist, the main agent should say so out loud and hand
+the spec's Manual Verification Guide to the user to run themselves, rather
+than quietly self-verifying. **This block is the one to update** when the
+`verify` subagent and its hook get built — replace this note with the
+actual subagent name/invocation and hook trigger once they exist, and keep
+the "main agent never self-verifies" rule regardless of the mechanism.
