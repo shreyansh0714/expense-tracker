@@ -37,6 +37,37 @@
     });
 })();
 
+// Profile: edit-profile modal, opened from the header edit button
+(function () {
+    var openBtn = document.getElementById("open-edit-profile");
+    var modal = document.getElementById("edit-profile-modal");
+    if (!openBtn || !modal) return;
+
+    var content = modal.querySelector(".modal-content");
+    var ANIMATION_MS = 420;
+
+    function openModal() {
+        modal.hidden = false;
+        if (content) {
+            content.classList.remove("opening");
+            void content.offsetWidth; // force reflow so the animation replays every open
+            content.classList.add("opening");
+            setTimeout(function () {
+                content.classList.remove("opening");
+            }, ANIMATION_MS);
+        }
+    }
+
+    function closeModal() {
+        modal.hidden = true;
+    }
+
+    openBtn.addEventListener("click", openModal);
+    modal.querySelectorAll("[data-modal-close]").forEach(function (el) {
+        el.addEventListener("click", closeModal);
+    });
+})();
+
 // Profile: verification-code popup for email changes
 (function () {
     var form = document.getElementById("profile-form");

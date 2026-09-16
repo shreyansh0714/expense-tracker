@@ -9,6 +9,7 @@ from database.db import (
     create_user,
     get_db,
     get_monthly_category_totals,
+    get_monthly_transaction_count,
     get_recent_expenses,
     get_user_by_email,
     get_user_by_id,
@@ -121,6 +122,8 @@ def profile():
     user = get_user_by_id(session["user_id"])
     category_totals = get_monthly_category_totals(user["id"])
     monthly_total = sum(row["total"] for row in category_totals)
+    transaction_count = get_monthly_transaction_count(user["id"])
+    top_category = category_totals[0]["category"] if category_totals else None
     recent_expenses = get_recent_expenses(user["id"], 5)
     member_since = datetime.strptime(
         user["created_at"], "%Y-%m-%d %H:%M:%S"
@@ -138,6 +141,8 @@ def profile():
             member_since=member_since,
             category_totals=category_totals,
             monthly_total=monthly_total,
+            transaction_count=transaction_count,
+            top_category=top_category,
             recent_expenses=recent_expenses,
             original_email=user["email"],
             budget_amount=user["monthly_budget"],
@@ -202,6 +207,8 @@ def profile():
             member_since=member_since,
             category_totals=category_totals,
             monthly_total=monthly_total,
+            transaction_count=transaction_count,
+            top_category=top_category,
             recent_expenses=recent_expenses,
             original_email=user["email"],
             budget_amount=user["monthly_budget"],
@@ -227,6 +234,8 @@ def profile():
             member_since=member_since,
             category_totals=category_totals,
             monthly_total=monthly_total,
+            transaction_count=transaction_count,
+            top_category=top_category,
             recent_expenses=recent_expenses,
             original_email=user["email"],
             budget_amount=user["monthly_budget"],

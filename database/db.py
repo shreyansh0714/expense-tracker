@@ -154,6 +154,21 @@ def get_monthly_category_totals(user_id):
         conn.close()
 
 
+def get_monthly_transaction_count(user_id):
+    conn = get_db()
+    try:
+        today = date.today()
+        month_start = today.replace(day=1)
+        month_end = (month_start + timedelta(days=32)).replace(day=1)
+        return conn.execute(
+            "SELECT COUNT(*) FROM expenses "
+            "WHERE user_id = ? AND date >= ? AND date < ?",
+            (user_id, month_start.isoformat(), month_end.isoformat()),
+        ).fetchone()[0]
+    finally:
+        conn.close()
+
+
 def get_recent_expenses(user_id, limit=5):
     conn = get_db()
     try:

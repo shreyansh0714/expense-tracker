@@ -68,15 +68,21 @@ contains.
 1. **Read the target template** (and its route in `app.py`, read-only) to
    see what's actually on the page — the content, not just the file name.
 2. **Classify each section** against the component table in
-   `references/design-system.md`: is it a content/stat panel, a printed/
-   receipt-style list, a form, a reference/notes card, or a sticky-note/
-   reminder? A single page can mix several — a profile page, for example,
-   is a form panel plus maybe a notes card.
-3. **Apply the matching treatment** from the reference file: the right
-   torn-edge/rounded-corner choice, the right accent decoration (tape vs.
-   pin vs. none), the right typeface for that content type, the grain/
-   crease texture. Add any missing CSS custom properties to `:root` in
-   `style.css` rather than hardcoding a new color inline.
+   `references/design-system.md`: is it a content/data panel (stat tiles,
+   dashboard cards, and receipt-style tables all share one treatment now
+   — see step 3), a form, a reference/notes card, or a reminder/sticky
+   note? A single page can mix several — a profile page, for example, is
+   a form panel plus maybe a notes card.
+3. **Apply the matching treatment** from the reference file. As of the
+   2026-09-17 revision, grain, crease, and the aged-paper filter are
+   applied **once at the page level**, never per card — don't add them to
+   an individual component. Most cards get the shared hand-drawn border
+   (not a torn edge — that's retired) and the right typeface for that
+   content type (e.g. `--font-type` for printed/receipt rows). Add tape or
+   a pin **only** if this specific card is genuinely reminder/reference
+   content stuck onto the page for quick lookup — most cards get neither.
+   Add any missing CSS custom properties to `:root` in `style.css` rather
+   than hardcoding a new color inline.
 4. **Leave structure and logic untouched.** Class names can change, markup
    can gain purely decorative wrapper elements, but form fields, routes,
    and data flow stay exactly as they were.
