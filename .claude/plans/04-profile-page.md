@@ -44,33 +44,38 @@ Spec: `.claude/specs/04-profile-page.md`
 
 ## Tasks
 
-- [ ] `database/db.py`: add `monthly_budget REAL` and `notes TEXT` to the
+- [x] `database/db.py`: add `monthly_budget REAL` and `notes TEXT` to the
       `users` table in `init_db()` + guarded `ALTER TABLE` for each
-- [ ] `database/db.py`: add `get_user_by_id(user_id)`
-- [ ] `database/db.py`: add `update_user(user_id, name, email,
+- [x] `database/db.py`: add `get_user_by_id(user_id)`
+- [x] `database/db.py`: add `update_user(user_id, name, email,
       monthly_budget, notes, password=None)`
-- [ ] `database/db.py`: add `get_monthly_category_totals(user_id)`
+- [x] `database/db.py`: add `get_monthly_category_totals(user_id)`
       (current-calendar-month `GROUP BY category`)
-- [ ] `database/db.py`: add `get_recent_expenses(user_id, limit=5)`
-- [ ] `app.py`: import `flash`; rewrite `profile()` with the auth guard,
+- [x] `database/db.py`: add `get_recent_expenses(user_id, limit=5)`
+- [x] `app.py`: import `flash`; rewrite `profile()` with the auth guard,
       `GET` display-data fetch, `POST` validation chain (mirroring
       `register`'s if/elif style), `update_user` call +
       `IntegrityError` catch, flash + redirect on success
-- [ ] `templates/base.html`: add "Profile" nav link inside the existing
+- [x] `templates/base.html`: add "Profile" nav link inside the existing
       `{% if session.user_id %}` block; add toast markup driven by
       `get_flashed_messages`
-- [ ] `static/css/style.css`: `.toast` styles (top-right, success/error
-      variants via `--accent`/`--danger`, fade transition); no new modal
-      CSS needed (reuses `.modal`)
-- [ ] `static/js/main.js`: toast auto-dismiss (~4s); verification-modal
+- [x] `static/css/style.css`: `.toast` styles (top-right, success/error
+      variants via `--accent`/`--danger`, fade transition), plus plain
+      functional profile-section styles and a narrower `.modal-content`
+      override for the verification popup (the shared `.modal` is sized
+      for the video embed, so this one instance needs a max-width tweak)
+- [x] `static/js/main.js`: toast auto-dismiss (~4s); verification-modal
       show/hide + resubmit flow, reusing the existing modal toggle pattern
-- [ ] `templates/profile.html`: full rewrite — settings form first
+- [x] `templates/profile.html`: full rewrite — settings form first
       (name/email/monthly_budget/notes/password fields, using
       `auth-card`/`form-group`/`form-input`/`btn-submit` conventions),
       then member-since line, monthly summary + category breakdown,
       recent-activity list, plus the verification-code modal markup
 - [ ] Run through the spec's Manual Verification Guide end to end once all
-      of the above is implemented
+      of the above is implemented — **left for the developer to do**, per
+      CLAUDE.md's subagent policy: the main agent doesn't self-verify its
+      own implementation (no `verify` subagent exists yet), so this box
+      stays unchecked until you've actually run the guide yourself
 
 **Standing rule while working this checklist**: immediately after finishing
 each task above, re-open this plan file and check its box — don't batch
@@ -91,3 +96,29 @@ this is functionally complete).
 Run the spec's own Manual Verification Guide
 (`.claude/specs/04-profile-page.md`) end to end — all 13 numbered steps —
 plus the End-to-End Verification walkthrough at the bottom of that spec.
+
+## Revision — layout/content fix + spendly-ui-polish applied
+
+The initial implementation above shipped correctly *for the design as
+originally written* — single-column stacked cards, plain unstyled markup,
+polish deferred. Two things then changed, in a follow-up fix (not a new
+numbered spec — same feature, corrected):
+
+1. **Layout**: single-column stacked cards → two-column grid (60/40),
+   insights left (Overview, Recent activity, Notes), settings form right,
+   collapsing to one column (insights first) on narrow screens. The
+   "Page layout" bullet in the Design Plan above is superseded by this.
+2. **Content**: a budget-vs-spent comparison (`₹X of ₹Y budget used`) was
+   added to the Overview card, and the Notes field moved out of the
+   settings form into its own standalone card (still submits through the
+   same `#profile-form` via the HTML `form="profile-form"` attribute — no
+   new route, no behavior change).
+3. **`spendly-ui-polish` was invoked** on the finished page per its
+   component table: editable-form-panel treatment on the settings card,
+   content-panel on Overview, printed-receipt-strip on Recent activity,
+   reference/notes-card on Notes. This was always the plan (see "Display
+   content" bullet above) — it just hadn't actually been run yet when this
+   file was first written.
+
+Full context: this session's transcript, and the corrected plan the
+developer approved for this fix.
