@@ -137,6 +137,106 @@ https://claude.ai/artifact/6vjCPWhWYkaTTQqTYzvqu3
   implementation is done — that's a separate, currently-unbuilt piece
   (the `verify` subagent), not this section.
 
+## Spec interview convention
+
+- `/create-spec`'s interview (Step 8) asks about editable/mutation content
+  and read-only/display content as two separate questions, checks for any
+  existing design mockup/prototype from earlier conversations before
+  finalizing scope, and closes with a catch-all "anything else?" question.
+  See `.claude/commands/create-spec.md` Step 8 for the full rule — added
+  after the Step 4 (Profile page) spec initially missed its read-only
+  display content (spend summary, category breakdown, notes) because the
+  interview only asked about editable fields.
+
+## Mockup content convention
+
+- A design mockup/moodboard (e.g. the paper-ledger artifact
+  `spendly-ui-polish` is locked to) shows *look*, not *content* — any text
+  written on it is fake, placed there only to make the mockup look
+  realistic. When applying visual polish from a mockup, copy its
+  colors/spacing/typography/treatment; never copy its words onto a real
+  page. Real page content always comes from the spec or the page's own
+  data, never from a mockup's placeholder text. See
+  `.claude/skills/spendly-ui-polish/references/design-system.md`'s "What
+  this skill should never do" section for the full rule — added after the
+  paper-ledger moodboard's fake "auto-calculated from last 3 months"
+  caption and its two "Pinned" process-note stickies were nearly mistaken
+  for real requirements on the Step 4 (Profile page) spec.
+
+## Explanation & document clarity convention
+
+- Never explain a decision, a gap, or "what changed" using a bare pointer
+  like "this gap," "that issue," or "the problem above" and assume the
+  reader already holds the reference in mind. Always restate, in plain
+  words, exactly what's being pointed at — quote the actual source
+  text/file/line where one exists.
+- When the answer to a question is a set of yes/no or status items (e.g.
+  "are these implemented?", "what changed?"), answer with a table —
+  item → status → one-line reason — not a paragraph the reader has to
+  parse to extract the answer.
+- This applies everywhere the developer has to read and understand
+  something Claude produced: chat replies, **and every section of a spec
+  or plan** — not just the Manual Verification Guide, which already had
+  to be this concrete by its own convention above.
+
+  **Bad** (a real line from this project's history, flagged by the
+  developer as unclear): *"That's a real gap — want me to add it now?"*
+  — vague pointer, no restated reference, forces the reader to scroll back
+  and guess which gap.
+
+  **Good** (the corrected version the developer confirmed worked):
+  *"Two mockup captions were fake demo text, not real features: 'auto-
+  calculated from last 3 months' under the budget field, and the two
+  'Pinned' stickies ('Beautify only — CSS + markup polish...', 'Read the
+  spec first. Style second.'). Nothing today stops a future page-polish
+  pass from copying that text onto a real page. Want me to add a rule
+  preventing that — yes or no?"* — names the exact text, states the
+  concrete risk in one sentence, ends with one direct question.
+
+  **Bad** (status question answered as prose): *"Most of what you asked
+  about is implemented — notes and the spend summary are done, though the
+  transaction history part is more of a preview than a full history since
+  that got scoped down earlier."*
+
+  **Good** (same content, as a table):
+
+  | Item | Implemented? |
+  |---|---|
+  | Personal notes section | Yes |
+  | Monthly total spend | Yes |
+  | Category breakdown | Yes |
+  | Full transaction history | No — scoped down to a 5-item preview earlier |
+
+- **Why:** added 2026-09-16 after the developer said, verbatim: "explain
+  in simple and plain terms and also dont talk without any reference and
+  assuming i will catch it." The corrected explanation (quoted text +
+  concrete risk + single question) got the reply "this explanation was
+  good and i was able to understand" — that's the calibrated bar for
+  every explanation and every spec/plan section from here on, not just
+  the one that prompted this rule.
+
+## Session scope convention
+
+- Don't bundle a whole page's worth of work into one uninterrupted
+  implementation pass — layout, every piece of content, and full visual
+  polish all at once. Build and get one piece reviewed before moving to
+  the next.
+- **Why:** the Step 4 (Profile page) implementation tried to do the
+  two-column layout, every piece of read-only content (member-since,
+  budget-vs-spent, category breakdown, recent activity, notes), *and* the
+  full `spendly-ui-polish` visual treatment in one session. Result,
+  confirmed by the developer directly on 2026-09-16: "the profile page ui
+  is missing lots of things that we have decided and also the data is not
+  rendered correctly on the page rn." Their own stated lesson: "never
+  implement too many features all together in one session." See the
+  Future Tasks entry below for the actual cleanup this now needs.
+- **How to apply:** when a plan's Tasks checklist has several
+  independent-ish pieces (e.g. structure, then content A, then content B,
+  then visual polish), stop and show the developer what's built after
+  each piece — or at minimum after structure and after content, before
+  visual polish — rather than running the entire checklist end to end and
+  presenting it all at once.
+
 ## Plan checklists
 
 - Every implementation plan (Plan Mode output, or a plan written under `.claude/plans/`) must include a literal `- [ ]` checklist of concrete steps, not just prose — this is the drift guard so progress survives a mid-task compaction or context reset: re-reading the plan file tells you exactly what's done vs. pending without re-deriving it from a diff.
@@ -191,3 +291,43 @@ No lint/format tooling is configured — don't assume `black`/`flake8`/`ruff` ar
 | `database/db.py` (`get_db`, `init_db`, `seed_db`) | Implemented — Step 1 (`users`/`expenses` tables, `PRAGMA foreign_keys = ON`, demo seed data) |
 
 **Do not implement a stub route unless the active task explicitly asks for that step.**
+
+## Future Tasks / Features
+
+<!-- Deferred during spec interviews because they need infrastructure this
+     project doesn't have yet, or their own spec. Not stubs in app.py —
+     just tracked here so they aren't lost. Remove an entry once it's been
+     turned into a real numbered spec under .claude/specs/. -->
+
+- **Profile page UI rework (not a new feature — finish Step 4 as spec'd).**
+  Confirmed by the developer on 2026-09-16: the Profile page is still
+  missing several elements already decided in
+  `.claude/specs/04-profile-page.md` / `.claude/plans/04-profile-page.md`
+  (the "Revision" section), and the data that does render on the page is
+  incorrect. Needs another implementation pass, done in smaller pieces per
+  the Session scope convention above rather than all at once: re-check
+  every item in the spec's Acceptance Criteria and the plan's Design Plan
+  against what's actually on the live page before considering Step 4 done.
+  No new spec needed — this is finishing existing scope, not new scope.
+- **Budget threshold alerts.** Surfaced during the Step 4 (Profile page)
+  spec interview: once a user sets a monthly budget, warn them (a toast) at
+  90% of it consumed, and audit-log the alert (message type, timestamp,
+  user). Needs expense-aggregation logic that belongs with the future
+  Dashboard feature — needs its own spec, including what exactly "audit the
+  logs" should record and where those logs live.
+- **Real email-change verification (OTP).** Surfaced during the Step 4
+  (Profile page) spec interview: changing your account email should send a
+  one-time code to the *new* address and require it back before the change
+  takes effect. Needs an actual email-sending mechanism (SMTP or a service)
+  and credential/config handling — needs its own spec. Until this exists,
+  Step 4 uses a temporary, explicitly-non-production stand-in (an
+  environment-variable bypass code) — see `.claude/specs/04-profile-page.md`.
+- **Auto-calculated suggested monthly budget.** Surfaced from the original
+  paper-ledger moodboard's profile-form mockup, which had a caption reading
+  "auto-calculated from last 3 months" under the budget field — that
+  calculation was never a real requirement and was deliberately excluded
+  from the Step 4 implementation (the caption was mockup flavor text, not
+  a decided feature). Worth considering for real later: suggest a monthly
+  budget based on the average of the user's last 3 months of expenses.
+  Needs its own spec — in particular, what happens for an account with
+  less than 3 months of history.

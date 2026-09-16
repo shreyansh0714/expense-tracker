@@ -141,13 +141,48 @@ below isn't competing for space with every file the exploration touched.
 
 ## Step 8 — Interview the user
 
-Use `AskUserQuestion` to nail down functional requirements, the API/data
-shape, constraints, and edge cases. Don't invent requirements the user
-hasn't stated.
+A feature name like "profile page" pulls attention toward its editable
+half by default — form fields, validation, what gets submitted — because
+that's the concrete, obvious part. Nothing forces a separate look at the
+read-only half, so it silently drops out unless you ask for it on
+purpose. Ask these as genuinely separate `AskUserQuestion` questions, not
+one blended one:
 
-**Why:** a spec is only as good as its assumptions. Guessing at a
-requirement here is how a spec quietly encodes a decision the user never
-actually made.
+1. **Mutation** — "What should the user be able to change or submit
+   here?"
+2. **Display** — "What should the user see here that they can't change —
+   summaries, history, any other read-only content?"
+
+Then, before moving on:
+
+- **Check for an existing design reference.** If a mockup, prototype,
+  Figma reference, or artifact for this feature already exists —
+  including one shown in an earlier, unrelated-seeming conversation this
+  session or a prior one — walk through it item by item with the user and
+  ask which pieces are real functional requirements versus pure
+  decoration. A reference shown once, in passing, elsewhere, must not
+  silently fail to become a requirement here.
+- **Ask the boundary question whenever a related-but-deferred feature
+  exists.** If CLAUDE.md's roadmap or Future Tasks lists something related
+  that's being built later (e.g. a Dashboard), ask explicitly: "Given
+  [related feature] is being built separately later, is there any
+  summary/at-a-glance version of that data that still belongs on *this*
+  page in the meantime?" Get that boundary settled here, not negotiated
+  reactively after the spec is already written.
+- **Close with a catch-all**, right before Step 9: "Is there anything else
+  this page should show or do that we haven't covered yet?"
+
+Across all of this: don't invent requirements the user hasn't stated.
+
+**Why:** a spec is only as good as its assumptions, and an assumption
+doesn't have to be *wrong* to be a problem — it can just be *incomplete*.
+A single blended "functional requirements" question reliably captures the
+mutation half of a feature and just as reliably misses the display half,
+because nothing about asking it makes you notice what it left out. The
+mockup check and the boundary question close the two other ways that gap
+showed up in practice: a visual reference from a different conversation
+thread never turning into a written requirement, and a deferred feature's
+boundary being decided implicitly instead of asked about.
 
 ## Step 9 — Write the spec
 
