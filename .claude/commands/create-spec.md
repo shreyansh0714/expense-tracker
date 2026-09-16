@@ -156,7 +156,7 @@ otherwise, the highest existing `NN-` prefix in `.claude/specs/` + 1,
 zero-padded to 2 digits.
 
 Write `.claude/specs/NN-<slug>.md` (your own Write tool call — never a
-`!` block) with exactly these 9 sections, in this order, each a plain
+`!` block) with exactly these 10 sections, in this order, each a plain
 `##` heading, filled with real content grounded in Steps 3, 7 and 8 — no
 placeholders:
 
@@ -170,16 +170,28 @@ placeholders:
 6. **Out of Scope** — what this feature explicitly will NOT do.
 7. **Edge Cases and Error Handling** — failure modes and how they're handled.
 8. **Acceptance Criteria** — checklist for when this is considered done.
-9. **End-to-End Verification** — a concrete, runnable step that proves the
-   feature works once implemented.
+9. **Manual Verification Guide** — the developer driving this project is a
+   beginner and does not yet know how to verify acceptance criteria on
+   their own. For *every* item in section 8, write explicit, beginner-safe,
+   step-by-step instructions for checking it by hand: exact UI paths (e.g.
+   "DevTools → Application tab → Storage → Cookies → pick the origin
+   matching your URL bar exactly"), exact commands to run (`curl`, `pytest`,
+   a `sqlite3` read-only query), and the exact expected output/result for
+   each. Assume no prior familiarity with the tool being used — this
+   section is a manual, not a hint.
+10. **End-to-End Verification** — a concrete, runnable step that proves the
+    feature works once implemented.
 
-**Why these 9 and not fewer:** sections 1, 2, 3, 5, 7 and 8 (Problem
+**Why these 10 and not fewer:** sections 1, 2, 3, 5, 7 and 8 (Problem
 Statement, Functional Requirements, APIs, Constraints, Edge Cases and
 Error Handling, Acceptance Criteria) were requested up front. Sections 4,
-6 and 9 (Files and Interfaces Involved, Out of Scope, End-to-End
+6 and 10 (Files and Interfaces Involved, Out of Scope, End-to-End
 Verification) were added after checking the official Claude Code docs —
 each closes a real gap the other 6 leave open (which files actually
 change, what's deliberately excluded, and how anyone proves it worked).
+Section 9 (Manual Verification Guide) was added later still, specifically
+because the developer here can't yet verify acceptance criteria
+unassisted — see CLAUDE.md's "Spec verification convention".
 
 ## Step 10 — Report back
 
@@ -219,3 +231,20 @@ it was actually broken into edits, and pairing the two numbers makes
 both easy to find together later. Without this note it's easy to
 finish planning and skip committing the plan, since Plan Mode's own
 output file lives outside the repo by default.
+
+## Convention — verifying the implementation (⚠️ TODO, not yet wired up)
+
+Once Plan Mode finishes implementing a spec, verifying it against that
+spec's **Acceptance Criteria** / **Manual Verification Guide** must be
+delegated to a dedicated `verify` subagent — **the main agent must never
+verify its own implementation.** This is a placeholder convention only:
+
+- No `.claude/agents/verify.md` exists yet.
+- No hook fires it automatically after an implementation plan completes.
+
+Until both of those exist, the main agent should say so out loud and hand
+the spec's Manual Verification Guide to the user to run themselves, rather
+than quietly self-verifying. **This block is the one to update** when the
+`verify` subagent and its hook get built — replace this note with the
+actual subagent name/invocation and hook trigger once they exist, and keep
+the "main agent never self-verifies" rule regardless of the mechanism.

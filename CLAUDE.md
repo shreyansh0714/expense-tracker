@@ -83,6 +83,60 @@ Only what's already in `requirements.txt` — don't add new dependencies without
 - When asked to plan, delegate codebase research to a subagent before presenting the plan.
 - Use the built-in `Plan` subagent when working in plan mode.
 
+> ⚠️ **TODO — verify subagent, not yet built.** Once a spec's implementation
+> plan finishes, verifying the feature against the spec's Acceptance
+> Criteria / Manual Verification Guide must be delegated to a dedicated
+> `verify` subagent — **the main agent must never self-verify.** This is a
+> placeholder rule only: there is no `.claude/agents/verify.md` and no hook
+> wiring it in automatically yet. Until that exists, the main agent should
+> say so explicitly and ask the user to verify manually (using the spec's
+> Manual Verification Guide — see "Spec verification convention" below)
+> instead of quietly verifying itself. Update this note when the `verify`
+> subagent and its hook are actually built.
+
+## Learning notes artifact
+
+The developer is building this project as a learning exercise and keeps a
+living reference doc, **Spendly Field Notes**, for backend/Python/Flask
+concepts they're new to (explained through what they already know —
+React, Redux, JS, HTML/CSS, Git):
+
+https://claude.ai/artifact/6vjCPWhWYkaTTQqTYzvqu3
+
+- **Update it in place** (same URL) as the project grows or as new doubts
+  come up in a session — don't create a new artifact. Read it first
+  (`Artifact` action `read`), then republish with `url:` set to the link
+  above, following the section template already established in the doc
+  (prerequisite flag → why → analogy-first what → one concrete Spendly
+  example → how it works → good practices → when to use/not → where
+  else it shows up). Section 0 (project map) should get redrawn whenever
+  a row in the "Implemented vs stub routes" table below actually changes.
+- **Before re-explaining something from scratch in chat, check whether
+  the artifact already covers it.** If it does, point the developer to
+  that artifact section instead of retyping the explanation — the
+  artifact is the durable copy; chat explanations aren't. Only add fresh
+  chat explanation for something genuinely new, then fold it into the
+  artifact per the update rule above.
+- See the `spendly-beginner-teaching-style` memory file for the exact
+  explanation pattern to follow, and `../prompt.md` (one level up, next
+  to this project folder) for the full reusable process this artifact
+  was built from.
+
+## Spec verification convention
+
+- The developer driving this project is a beginner and does not yet know how
+  to verify acceptance criteria independently (e.g. reading a session
+  cookie in DevTools, running a `curl`/`pytest` check, reading a server
+  log). Every spec written by `/create-spec` must therefore include a
+  **Manual Verification Guide** section directly below **Acceptance
+  Criteria** — explicit, beginner-friendly, step-by-step instructions
+  (exact UI paths, exact commands, exact expected output) for verifying
+  *each* acceptance-criteria item by hand. See
+  `.claude/commands/create-spec.md` for the section this produces.
+- See the subagent policy above for who actually runs verification once an
+  implementation is done — that's a separate, currently-unbuilt piece
+  (the `verify` subagent), not this section.
+
 ## Plan checklists
 
 - Every implementation plan (Plan Mode output, or a plan written under `.claude/plans/`) must include a literal `- [ ]` checklist of concrete steps, not just prose — this is the drift guard so progress survives a mid-task compaction or context reset: re-reading the plan file tells you exactly what's done vs. pending without re-deriving it from a diff.
