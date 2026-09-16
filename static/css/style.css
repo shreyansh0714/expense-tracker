@@ -705,6 +705,11 @@ a { color: inherit; text-decoration: none; }
 }
 
 .profile-header {
+    position: relative;
+    z-index: 1;
+    background: rgba(255, 255, 255, .8);
+    border-radius: var(--radius-md);
+    padding: 1.85rem 2.1rem;
     display: flex;
     flex-direction: column;
     gap: 1rem;
@@ -784,8 +789,9 @@ a { color: inherit; text-decoration: none; }
 }
 
 .stat-tile {
+    position: relative;
+    z-index: 1;
     background: var(--paper-card);
-    border: 1px solid var(--border);
     border-radius: var(--radius-md);
     padding: 1.25rem 1.5rem;
     display: flex;
@@ -974,22 +980,18 @@ textarea.form-input {
 /* Profile page — paper-ledger polish (spendly-ui-polish)              */
 /* ------------------------------------------------------------------ */
 
-.profile-section .auth-card { margin-bottom: 0; }
-
-.paper-card {
+.profile-section {
     position: relative;
-    border: none;
-    background-color: var(--paper-card);
-    background-image: var(--crease);
+    background-color: var(--paper);
+    background-image: var(--crease), var(--crease-lines);
     background-blend-mode: multiply, multiply;
-    filter: drop-shadow(3px 7px 9px rgba(15,10,3,.28)) contrast(1.03) saturate(.93);
+    filter: contrast(1.05) saturate(.9);
 }
 
-.paper-card::after {
+.profile-section::after {
     content: "";
     position: absolute;
     inset: 0;
-    border-radius: inherit;
     background-image: var(--grain);
     background-size: 140px 140px;
     mix-blend-mode: multiply;
@@ -997,101 +999,88 @@ textarea.form-input {
     pointer-events: none;
 }
 
-.paper-card.torn-top {
-    clip-path: polygon(
-        0% 6px, 7% 0px, 14% 9px, 21% 2px, 29% 7px, 36% 0px, 43% 8px, 50% 3px,
-        57% 9px, 64% 1px, 71% 7px, 79% 0px, 86% 8px, 93% 2px, 100% 6px,
-        100% 100%, 0% 100%
-    );
-}
-
-.paper-card.torn-both {
-    padding-bottom: 2.5rem;
-    clip-path: polygon(
-        0% 6px, 7% 0px, 14% 9px, 21% 2px, 29% 7px, 36% 0px, 43% 8px, 50% 3px,
-        57% 9px, 64% 1px, 71% 7px, 79% 0px, 86% 8px, 93% 2px, 100% 6px,
-        100% calc(100% - 6px), 93% calc(100% - 2px), 86% calc(100% - 8px), 79% 100%,
-        71% calc(100% - 7px), 64% 100%, 57% calc(100% - 9px), 50% 100%,
-        43% calc(100% - 8px), 36% 100%, 29% calc(100% - 7px), 21% 100%,
-        14% calc(100% - 9px), 7% 100%, 0% calc(100% - 6px)
-    );
-}
-
-.paper-card.kraft { background-color: var(--kraft); }
-
-.paper-card.notes-card {
-    background-image:
-        var(--crease),
-        repeating-linear-gradient(to bottom, transparent 0 27px, var(--ruled-line) 27px 28px);
-    background-blend-mode: multiply, multiply, normal;
-}
-
-.paper-card.notes-card textarea.form-input {
-    background: transparent;
+.profile-section .auth-card {
+    position: relative;
+    z-index: 1;
+    margin-bottom: 0;
     border: none;
-    min-height: 8rem;
-    font-family: var(--font-type);
 }
+
+.hand-drawn { position: relative; }
+
+.hand-drawn > svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+.tilt-a { transform: rotate(-0.25deg); }
+.tilt-b { transform: rotate(-0.6deg); }
+.tilt-c { transform: rotate(0.5deg); }
+.tilt-d { transform: rotate(-0.3deg); }
+.tilt-e { transform: rotate(0.25deg); }
+.tilt-f { transform: rotate(-0.25deg); }
 
 .profile-card-title {
     font-style: italic;
 }
 
-.paper-pin,
-.paper-tape {
+.notes-sticky {
+    position: absolute;
+    top: -22px;
+    right: -16px;
+    z-index: 3;
+    width: 205px;
+    height: 92px;
+    overflow: hidden;
+    background: var(--sticky);
+    border-radius: 8px;
+    padding: .9rem 1rem;
+    box-shadow: 0 10px 22px rgba(0,0,0,.2);
+    transform: rotate(-4deg);
+    transition: width .25s ease, height .25s ease, transform .25s ease;
+}
+
+.notes-sticky:focus-within {
+    width: 340px;
+    height: 220px;
+    transform: rotate(0deg);
+    z-index: 50;
+}
+
+.notes-sticky-tape {
     position: absolute;
     top: -9px;
-    left: 50%;
-    translate: -50% 0;
-    z-index: 2;
+    left: 32%;
+    width: 46px;
+    height: 17px;
+    background: linear-gradient(rgba(255,255,255,.25), rgba(255,255,255,0)), var(--kraft-line);
+    opacity: .8;
+    rotate: -5deg;
+    box-shadow: 0 2px 3px rgba(0,0,0,.22);
 }
 
-.paper-pin {
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    background: radial-gradient(circle at 34% 30%, #f6dd9a, var(--accent-2) 60%, #8a5a12);
-    box-shadow: 0 3px 5px rgba(0,0,0,.4);
+.notes-sticky-title {
+    font-size: .82rem;
+    margin-bottom: .35rem;
 }
 
-.paper-tape {
-    width: 70px;
-    height: 24px;
-    top: -10px;
-    background: linear-gradient(rgba(255,255,255,.2), rgba(255,255,255,0)), var(--accent-2);
-    opacity: .62;
-    box-shadow: 0 2px 3px rgba(0,0,0,.25);
+.notes-sticky textarea.form-input {
+    width: 100%;
+    height: calc(100% - 1.7rem);
+    background: transparent;
+    border: none;
+    resize: none;
+    font-family: var(--font-type);
+    font-size: .82rem;
+    line-height: 1.45;
+    color: var(--ballpoint);
 }
 
-.paper-tape.left { left: 25%; rotate: -6deg; }
-.paper-tape.right { left: 75%; rotate: 5deg; }
-
-.pencil-tag {
-    display: inline-flex;
-    align-items: center;
-    gap: .3rem;
-    font-family: var(--font-body);
-    font-size: .68rem;
-    font-weight: 600;
-    color: var(--coral);
-    white-space: nowrap;
-}
-
-.paper-card-header {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: .75rem;
-    margin-bottom: 1.3rem;
-}
-
-.paper-hole {
-    width: 13px;
-    height: 13px;
-    border-radius: 50%;
-    background: var(--ink);
-    opacity: .12;
-    margin-bottom: 1rem;
+@media (prefers-reduced-motion: reduce) {
+    .notes-sticky { transition: none; }
 }
 
 

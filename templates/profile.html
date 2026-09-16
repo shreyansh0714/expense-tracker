@@ -4,18 +4,36 @@
 
 {% block content %}
 
+<svg width="0" height="0" style="position:absolute">
+    <filter id="hand-drawn" x="-6%" y="-25%" width="112%" height="150%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.018" numOctaves="3" seed="7" result="noise"></feTurbulence>
+        <feDisplacementMap in="SourceGraphic" in2="noise" scale="7"></feDisplacementMap>
+    </filter>
+</svg>
+
 <section class="profile-section">
 
-    <div class="profile-header">
-        <div class="profile-header-main">
-            <div class="profile-avatar">{{ (name[0]|upper) if name else "?" }}</div>
-            <div class="profile-header-info">
-                <h1 class="profile-name">{{ name }}</h1>
-                <p class="profile-email">{{ email }}</p>
-                <p class="profile-member-since">Member since {{ member_since }}</p>
+    <div class="hand-drawn tilt-a">
+        <svg preserveAspectRatio="none">
+            <rect x="1%" y="4%" width="98%" height="90%" rx="10" fill="none" stroke="var(--ink)" stroke-width="1.7" filter="url(#hand-drawn)"></rect>
+        </svg>
+        <div class="profile-header">
+            <div class="profile-header-main">
+                <div class="profile-avatar">{{ (name[0]|upper) if name else "?" }}</div>
+                <div class="profile-header-info">
+                    <h1 class="profile-name">{{ name }}</h1>
+                    <p class="profile-email">{{ email }}</p>
+                    <p class="profile-member-since">Member since {{ member_since }}</p>
+                </div>
             </div>
+            <button type="button" id="open-edit-profile" class="profile-edit-btn">&#9998; Edit profile</button>
         </div>
-        <button type="button" id="open-edit-profile" class="profile-edit-btn">&#9998; Edit profile</button>
+        <div class="notes-sticky">
+            <div class="notes-sticky-tape"></div>
+            <h2 class="profile-card-title notes-sticky-title">Notes to self</h2>
+            <textarea name="notes" form="profile-form" class="form-input" maxlength="2000"
+                      placeholder="Personal reminders, budgeting notes...">{{ notes }}</textarea>
+        </div>
     </div>
 
     {% if error %}
@@ -23,25 +41,44 @@
     {% endif %}
 
     <div class="profile-stats-row">
-        <div class="stat-tile">
-            <span class="stat-tile-label">Total Spent</span>
-            <span class="stat-tile-value">₹{{ "%.2f"|format(monthly_total) }}</span>
-            {% if budget_amount is not none %}
-            <span class="stat-tile-subtext">₹{{ "%.2f"|format(monthly_total) }} of ₹{{ "%.2f"|format(budget_amount) }} budget used</span>
-            {% endif %}
+        <div class="hand-drawn tilt-b">
+            <svg preserveAspectRatio="none">
+                <rect x="1.5%" y="5%" width="97%" height="88%" rx="8" fill="none" stroke="var(--ink)" stroke-width="1.5" filter="url(#hand-drawn)"></rect>
+            </svg>
+            <div class="stat-tile">
+                <span class="stat-tile-label">Total Spent</span>
+                <span class="stat-tile-value">₹{{ "%.2f"|format(monthly_total) }}</span>
+                {% if budget_amount is not none %}
+                <span class="stat-tile-subtext">₹{{ "%.2f"|format(monthly_total) }} of ₹{{ "%.2f"|format(budget_amount) }} budget used</span>
+                {% endif %}
+            </div>
         </div>
-        <div class="stat-tile">
-            <span class="stat-tile-label">Transactions</span>
-            <span class="stat-tile-value">{{ transaction_count }}</span>
+        <div class="hand-drawn tilt-c">
+            <svg preserveAspectRatio="none">
+                <rect x="1.5%" y="5%" width="97%" height="88%" rx="8" fill="none" stroke="var(--ink)" stroke-width="1.5" filter="url(#hand-drawn)"></rect>
+            </svg>
+            <div class="stat-tile">
+                <span class="stat-tile-label">Transactions</span>
+                <span class="stat-tile-value">{{ transaction_count }}</span>
+            </div>
         </div>
-        <div class="stat-tile">
-            <span class="stat-tile-label">Top Category</span>
-            <span class="stat-tile-value">{{ top_category or "—" }}</span>
+        <div class="hand-drawn tilt-d">
+            <svg preserveAspectRatio="none">
+                <rect x="1.5%" y="5%" width="97%" height="88%" rx="8" fill="none" stroke="var(--ink)" stroke-width="1.5" filter="url(#hand-drawn)"></rect>
+            </svg>
+            <div class="stat-tile">
+                <span class="stat-tile-label">Top Category</span>
+                <span class="stat-tile-value">{{ top_category or "—" }}</span>
+            </div>
         </div>
     </div>
 
     <div class="profile-content-grid">
 
+        <div class="hand-drawn tilt-e">
+        <svg preserveAspectRatio="none">
+            <rect x="1%" y="2.5%" width="98%" height="95%" rx="10" fill="none" stroke="var(--ink)" stroke-width="1.6" filter="url(#hand-drawn)"></rect>
+        </svg>
         <div class="auth-card">
             <h2 class="profile-card-title">Recent Transactions</h2>
             {% if recent_expenses %}
@@ -69,7 +106,12 @@
             <p class="profile-empty-state">No expenses logged yet.</p>
             {% endif %}
         </div>
+        </div>
 
+        <div class="hand-drawn tilt-f">
+        <svg preserveAspectRatio="none">
+            <rect x="1.2%" y="2.5%" width="97.5%" height="95%" rx="10" fill="none" stroke="var(--ink)" stroke-width="1.6" filter="url(#hand-drawn)"></rect>
+        </svg>
         <div class="auth-card">
             <h2 class="profile-card-title">By Category</h2>
             {% if category_totals %}
@@ -89,14 +131,8 @@
             <p class="profile-empty-state">No expenses logged this month yet.</p>
             {% endif %}
         </div>
+        </div>
 
-    </div>
-
-    <div class="auth-card paper-card notes-card torn-top">
-        <div class="paper-tape right"></div>
-        <h2 class="profile-card-title">Notes to self</h2>
-        <textarea name="notes" form="profile-form" class="form-input" maxlength="2000"
-                  placeholder="Personal reminders, budgeting notes...">{{ notes }}</textarea>
     </div>
 
 </section>

@@ -88,36 +88,41 @@ what changed.
       sparing-tape-pin/Notes-as-sticky-note philosophy the developer
       described. `--sticky`/`--sticky-mint` tokens added to `:root` in
       `style.css`, closing that previously-tracked gap.
-- [ ] Phase F: real paper-theme visual polish (global crumpled-paper page
-      background, hand-drawn card/table borders, sparing tape/pin,
-      Notes-card restyled as a sticky note per the revised doc) —
-      **deliberately not done yet.** Current look is plain/placeholder on
-      purpose (category pills reuse existing neutral tokens, cards are
-      plain `.auth-card`s, no torn-edge/tape/pin anywhere in the new
-      dashboard markup) — developer confirmed 2026-09-17 this is
-      expected, not a bug. Next up: a `frontend-design`-skill mockup
-      Artifact for the developer's approval, then real CSS via the
-      revised `spendly-ui-polish` skill.
-- [ ] Two cleanup items surfaced by the Phase E doc revision, deferred to
-      Phase F alongside the real CSS work (not done now — Phase E was
-      doc-only):
-      - `--paper-stack-1`/`--paper-stack-2` tokens in `style.css` are now
-        unused — the "paper-stack depth" technique they supported needed
-        a torn card edge to sit behind, and individual-card torn edges
-        are retired by the revision.
-      - The Notes card's actual CSS (`.paper-card.notes-card.torn-top` +
-        a tape strip) still reflects the *old* per-card system — the
-        revised doc's sticky-note rule says no torn edge. Real markup/CSS
-        alignment happens in Phase F, not yet.
-- [ ] Live-browser verification of the modal open/close, the crumple
-      animation, `prefers-reduced-motion` behavior, and the
-      email-verification modal triggering correctly from inside the new
-      edit-profile modal — **not done this session.** Playwright's
-      browser profile was locked by another process the whole session
-      (`Browser is already in use for .../mcp-chrome-7272251`).
-      Everything above is verified only via Flask test-client checks
-      (200 status, correct markup present) and direct code review — see
-      **Open Tasks** below.
+- [x] Phase F mockup: `frontend-design`-skill Artifact
+      (`claude.ai/artifact/6tKfNrS2cKZddUUBzVqn3g`) applied the revised
+      system to the profile page; developer reviewed, asked for more
+      background crumple + visible fold lines + the Notes card attached
+      to the header card's top-right corner, then approved.
+- [x] Phase F implementation: `templates/profile.html` +
+      `static/css/style.css` updated to match the approved mockup —
+      page-level crumple + fold lines scoped to `.profile-section`
+      (not global `body`), a shared `.hand-drawn` SVG-outline border
+      (`feTurbulence`/`feDisplacementMap`) on the header, stat tiles,
+      transactions table, and by-category card, each with a slight
+      individual `.tilt-*` rotation, and Notes converted from an inline
+      card into a `.notes-sticky` attached to the header card's corner —
+      small at rest, expands via `:focus-within` when the textarea is
+      focused, content in `--font-type` (typewriter), not `--font-hand`.
+      Old per-card system removed as dead code: `.paper-card` (+
+      `.torn-top`/`.torn-both`/`.kraft`/`.notes-card`), `.paper-pin`,
+      `.paper-tape`, `.pencil-tag`, `.paper-card-header`, `.paper-hole` —
+      confirmed via grep that nothing else in the app referenced them.
+- [ ] `--paper-stack-1`/`--paper-stack-2` tokens in `style.css` are still
+      unused (the "paper-stack depth" technique they supported needed a
+      torn card edge to sit behind, and torn edges are retired) — left
+      declared rather than removed, low-priority cleanup.
+- [ ] Live-browser verification — still not done, across two separate
+      sessions of trying. Playwright's browser profile stayed locked by
+      another process the entire time
+      (`Browser is already in use for .../mcp-chrome-7272251`), for: the
+      modal open/close, the crumple-open animation,
+      `prefers-reduced-motion` behavior, the email-verification modal
+      triggering from inside the edit-profile modal, the hand-drawn SVG
+      borders actually rendering as intended, the Notes sticky note's
+      `:focus-within` expand, and the page-level crumple/fold-line
+      background. Everything is verified only via Flask test-client
+      checks (200 status, correct markup present) and direct code
+      review — see **Open Tasks** below.
 - [ ] Full Gate 1 (Manual Verification Guide) + Gate 2 (`pytest`) pass —
       deliberately deferred to a later, consolidated verification once
       Phase E/F's visual work also lands, per the developer's explicit
@@ -150,7 +155,7 @@ against the live code.
 | Profile page (`app.py:135`) | Monthly budget renders in scientific notation for values ≥ ₹1,000,000 (Python's `:g` format switches to exponent form, e.g. `1e+06`) — a real display bug | Bug |
 | Profile page (`static/css/style.css`) | `.profile-card-title` applies italic to *every* card title, but `design-system.md`'s table only specifies italic for the reference/notes card specifically — may be an intentional broader reading of the Typography section, needs a judgment call | Needs a decision |
 | `spendly-ui-polish` skill | The 3 saved eval prompts (`evals/evals.json`) have never actually been run — no results/workspace exist | Unverified |
-| Profile page (Step 5 dashboard/modal) | Modal open/close, the crumple-open animation, `prefers-reduced-motion` behavior, and the nested email-verification-modal-from-inside-the-edit-modal flow are only verified via code review + Flask test-client checks — never exercised in a real browser (Playwright's browser profile was locked all session) | Unverified |
+| Profile page (Step 5 dashboard/modal + Phase F visual polish) | Modal open/close, the crumple-open animation, `prefers-reduced-motion` behavior, the nested email-verification-modal-from-inside-the-edit-modal flow, the hand-drawn SVG card borders, the page-level crumple/fold-line background, and the Notes sticky note's `:focus-within` expand are only verified via code review + Flask test-client checks — never exercised in a real browser (Playwright's browser profile stayed locked across every session this work touched) | Unverified |
 | `verify` subagent | Referenced as a TODO in 3 places (`CLAUDE.md` Subagent policy, `create-spec.md`, `implement-plan.md`) — still doesn't exist anywhere; whenever it's built, all 3 mentions need updating together, not just one | Known limitation |
 | `.claude/skill-briefs/spendly-ui-polish.md` | Stale scaffolding from before `skill-creator` ran — fully superseded by `.claude/skills/spendly-ui-polish/`, drifted out of sync with it. Safe-to-delete candidate | Cleanup |
 | `.claude/specs/01-databse-setup.md` | §14 "Definition of Done" checklist still all unchecked `- [ ]`, never flipped after the work was done | Doc-only |
