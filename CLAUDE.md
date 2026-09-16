@@ -237,6 +237,48 @@ https://claude.ai/artifact/6vjCPWhWYkaTTQqTYzvqu3
   visual polish — rather than running the entire checklist end to end and
   presenting it all at once.
 
+## Spec-Driven Development (SDD) workflow
+
+The developer's own working pattern for this project, named explicitly so
+it's a deliberate methodology rather than an implicit habit: **Spec**
+(what/why) → **Plan** (how) → **incremental build** → **Verify**. This is
+already how `/create-spec` and `/implement-plan` work — this section is
+the umbrella naming and the interview/verification standards under it.
+
+**Interview depth for spec/skill/command creation.** These three artifact
+types lock in decisions for a long time, so under-asking is expensive —
+confirmed by this session's own failure: the Step 4 interview asked a
+handful of questions and stopped, and the Profile page came out missing
+several elements the developer had already decided on. No fixed question
+count, but bias toward asking more, and run through this checklist before
+considering the interview done: edge cases, error handling, scope
+boundaries, naming/placement, and data shape. This standard applies to
+creating spec/skill/command files specifically — a small fix or tweak
+doesn't need the same interview depth.
+
+**Two verification gates, starting now** (not retroactive — Steps 1-4's
+already-shipped code isn't reopened to add this):
+- **Gate 1**: the Manual Verification Guide (the developer, by hand) —
+  *and* running the `/code-review` skill on the diff (Claude-driven).
+- **Gate 2**: automated `pytest` tests, aimed specifically at what a
+  manual pass might miss — cases that could break the app in a real
+  deployment. Before writing Gate 2 tests, interview the developer about
+  what the test should actually verify, so a test doesn't silently encode
+  a wrong guess about intent.
+- Alongside Gate 2, explicitly confirm the finished implementation matches
+  what the developer actually asked for — not a feature Claude quietly
+  built instead because it misread the intent. Ask directly if there's
+  any doubt; don't assume a technically-passing test means the right
+  thing got built.
+- Playwright end-to-end tests and a full CI/CD pipeline are explicitly
+  future work (not part of these two gates yet) — tracked in
+  `.claude/PROGRESS.md`'s Future Features table.
+- Subagent-driven verification (firing a subagent to check a feature
+  against its own spec's Acceptance Criteria) is the stated long-term
+  direction for Gate 1/2 both — see the `verify`-subagent TODO in
+  "Subagent policy" above. Not built yet; this section documents intent,
+  not a working mechanism.
+
 ## Plan checklists
 
 - Every implementation plan (Plan Mode output, or a plan written under `.claude/plans/`) must include a literal `- [ ]` checklist of concrete steps, not just prose — this is the drift guard so progress survives a mid-task compaction or context reset: re-reading the plan file tells you exactly what's done vs. pending without re-deriving it from a diff.
@@ -268,66 +310,13 @@ No lint/format tooling is configured — don't assume `black`/`flake8`/`ruff` ar
 - Passwords must go through Werkzeug's hashing helpers once auth is implemented — never store or compare plaintext passwords.
 - Keep route logic in `app.py` thin; don't scatter data-access code across templates or static JS.
 - Once a stub route's step is implemented, it should render a template — don't leave it returning a raw string.
-- After implementing and verifying a stubbed feature, **ask the user** whether to update the "Implemented vs stub routes" table below — don't edit it unprompted, don't skip asking.
+- **Do not implement a stub route unless the active task explicitly asks for that step.** Route-by-route implemented/stub status lives in `.claude/PROGRESS.md`, not here.
 
-## Implemented vs stub routes
+## Project status
 
-<!-- This table is the fastest way to know what's safe to build on vs. what's intentionally unfinished.
-     After implementing AND verifying a stubbed feature, ASK the user whether to update this table —
-     never edit it unprompted, and never leave it silently stale either. -->
-
-| Route | Status |
-|---|---|
-| `GET /` | Implemented — renders `landing.html` |
-| `GET/POST /register` | Implemented — renders `register.html`, POST creates a user and starts a session |
-| `GET/POST /login` | Implemented — renders `login.html`, POST verifies email/password and starts a session |
-| `GET /terms` | Implemented — renders `terms.html` |
-| `GET /privacy` | Implemented — renders `privacy.html` |
-| `GET /logout` | Implemented — clears session, redirects to `landing` |
-| `GET /profile` | Stub — Step 4 |
-| `GET /expenses/add` | Stub — Step 7 |
-| `GET /expenses/<id>/edit` | Stub — Step 8 |
-| `GET /expenses/<id>/delete` | Stub — Step 9 |
-| `database/db.py` (`get_db`, `init_db`, `seed_db`) | Implemented — Step 1 (`users`/`expenses` tables, `PRAGMA foreign_keys = ON`, demo seed data) |
-
-**Do not implement a stub route unless the active task explicitly asks for that step.**
-
-## Future Tasks / Features
-
-<!-- Deferred during spec interviews because they need infrastructure this
-     project doesn't have yet, or their own spec. Not stubs in app.py —
-     just tracked here so they aren't lost. Remove an entry once it's been
-     turned into a real numbered spec under .claude/specs/. -->
-
-- **Profile page UI rework (not a new feature — finish Step 4 as spec'd).**
-  Confirmed by the developer on 2026-09-16: the Profile page is still
-  missing several elements already decided in
-  `.claude/specs/04-profile-page.md` / `.claude/plans/04-profile-page.md`
-  (the "Revision" section), and the data that does render on the page is
-  incorrect. Needs another implementation pass, done in smaller pieces per
-  the Session scope convention above rather than all at once: re-check
-  every item in the spec's Acceptance Criteria and the plan's Design Plan
-  against what's actually on the live page before considering Step 4 done.
-  No new spec needed — this is finishing existing scope, not new scope.
-- **Budget threshold alerts.** Surfaced during the Step 4 (Profile page)
-  spec interview: once a user sets a monthly budget, warn them (a toast) at
-  90% of it consumed, and audit-log the alert (message type, timestamp,
-  user). Needs expense-aggregation logic that belongs with the future
-  Dashboard feature — needs its own spec, including what exactly "audit the
-  logs" should record and where those logs live.
-- **Real email-change verification (OTP).** Surfaced during the Step 4
-  (Profile page) spec interview: changing your account email should send a
-  one-time code to the *new* address and require it back before the change
-  takes effect. Needs an actual email-sending mechanism (SMTP or a service)
-  and credential/config handling — needs its own spec. Until this exists,
-  Step 4 uses a temporary, explicitly-non-production stand-in (an
-  environment-variable bypass code) — see `.claude/specs/04-profile-page.md`.
-- **Auto-calculated suggested monthly budget.** Surfaced from the original
-  paper-ledger moodboard's profile-form mockup, which had a caption reading
-  "auto-calculated from last 3 months" under the budget field — that
-  calculation was never a real requirement and was deliberately excluded
-  from the Step 4 implementation (the caption was mockup flavor text, not
-  a decided feature). Worth considering for real later: suggest a monthly
-  budget based on the average of the user's last 3 months of expenses.
-  Needs its own spec — in particular, what happens for an account with
-  less than 3 months of history.
+Route-by-route implemented/stub status, deferred future features, and
+known open issues in already-built work all live in `.claude/PROGRESS.md`
+— kept out of this file so `CLAUDE.md` stays focused on rules for working
+in this repo rather than a snapshot of current status. That file updates
+automatically as work happens (no need to ask first, unlike changes to
+this file's actual rules).
