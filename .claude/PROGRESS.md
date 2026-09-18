@@ -11,6 +11,27 @@ Each item below names the session (by date) and commit (short hash + one-
 line message) it landed in, so you can `git show <hash>` to see exactly
 what changed.
 
+## Routes — implemented vs stub
+
+The fastest way to know what's safe to build on vs. what's intentionally
+unfinished. Flip a row to Implemented in the same commit that builds it.
+
+| Route | Status |
+|---|---|
+| `GET /` | Implemented — renders `landing.html` |
+| `GET/POST /register` | Implemented — Step 2, creates a user and starts a session |
+| `GET/POST /login` | Implemented — Step 3, verifies email/password and starts a session |
+| `GET /logout` | Implemented — Step 3, clears the session, redirects to `landing` |
+| `GET /terms` | Implemented — renders `terms.html` |
+| `GET /privacy` | Implemented — renders `privacy.html` |
+| `GET/POST /profile` | Implemented — Steps 4-5, dashboard + edit modal |
+| `GET /expenses/add` | Stub — Step 7 |
+| `GET /expenses/<id>/edit` | Stub — Step 8 |
+| `GET /expenses/<id>/delete` | Stub — Step 9 |
+| `database/db.py` | Implemented — Step 1 tables + helpers added by later steps |
+
+**Do not implement a stub route unless the active task explicitly targets that step.**
+
 ## Progress, by Step
 
 ### Pre-Step scaffolding (2026-08-25 – 2026-08-31)
@@ -123,7 +144,7 @@ what changed.
       background. Everything is verified only via Flask test-client
       checks (200 status, correct markup present) and direct code
       review — see **Open Tasks** below.
-- [ ] Full Gate 1 (Manual Verification Guide) + Gate 2 (`pytest`) pass —
+- [ ] Full Validate (Manual Verification Guide) + `/test-feature` + `/code-review-feature` pass —
       deliberately deferred to a later, consolidated verification once
       Phase E/F's visual work also lands, per the developer's explicit
       choice this session (not run incrementally after each phase).
@@ -137,7 +158,7 @@ lost. Move an entry out once it becomes a real numbered spec under
 
 | Feature | Why deferred | Needs |
 |---|---|---|
-| Playwright end-to-end tests + CI/CD pipeline | Explicitly future work per the developer (2026-09-17) — the project only has Gate 1 (manual + `/code-review`) and Gate 2 (`pytest`) so far | Its own spec — which flows/pages get e2e coverage, and what CI provider/pipeline to use |
+| Playwright end-to-end tests + CI/CD pipeline | Explicitly future work per the developer (2026-09-17) — the project has Validate (manual), `/test-feature` (pytest via subagents) and `/code-review-feature` (security + quality subagents) so far | Its own spec — which flows/pages get e2e coverage, and what CI provider/pipeline to use |
 | Budget threshold alerts (toast at 90% of budget consumed + audit log) | Needs expense-aggregation logic that belongs with the future Dashboard | Its own spec, including what "audit the logs" records and where |
 | Real email-change verification (OTP to the new address) | Needs an actual email-sending mechanism + credential handling | Its own spec — `PROFILE_EMAIL_BYPASS_CODE` is the explicit non-production stand-in until then |
 | Auto-calculated suggested monthly budget (from last 3 months of spending) | Was mockup flavor text on the paper-ledger moodboard, never a real requirement | Its own spec — in particular, behavior for an account with under 3 months of history |
@@ -156,7 +177,7 @@ against the live code.
 | Profile page (`static/css/style.css`) | `.profile-card-title` applies italic to *every* card title, but `design-system.md`'s table only specifies italic for the reference/notes card specifically — may be an intentional broader reading of the Typography section, needs a judgment call | Needs a decision |
 | `spendly-ui-polish` skill | The 3 saved eval prompts (`evals/evals.json`) have never actually been run — no results/workspace exist | Unverified |
 | Profile page (Step 5 dashboard/modal + Phase F visual polish) | Modal open/close, the crumple-open animation, `prefers-reduced-motion` behavior, the nested email-verification-modal-from-inside-the-edit-modal flow, the hand-drawn SVG card borders, the page-level crumple/fold-line background, and the Notes sticky note's `:focus-within` expand are only verified via code review + Flask test-client checks — never exercised in a real browser (Playwright's browser profile stayed locked across every session this work touched) | Unverified |
-| `verify` subagent | Referenced as a TODO in 3 places (`CLAUDE.md` Subagent policy, `create-spec.md`, `implement-plan.md`) — still doesn't exist anywhere; whenever it's built, all 3 mentions need updating together, not just one | Known limitation |
+| `verify` subagent | Dropped on 2026-09-19: `/test-feature` covers the automatable acceptance criteria and the manual Validate step covers visual ones. The TODO was removed from `CLAUDE.md` and `create-spec.md`. Revisit when Playwright lands | Resolved — not needed |
 | `.claude/skill-briefs/spendly-ui-polish.md` | Stale scaffolding from before `skill-creator` ran — fully superseded by `.claude/skills/spendly-ui-polish/`, drifted out of sync with it. Safe-to-delete candidate | Cleanup |
 | `.claude/specs/01-databse-setup.md` | §14 "Definition of Done" checklist still all unchecked `- [ ]`, never flipped after the work was done | Doc-only |
 | `.claude/plans/01-database-setup.md` | Describes a verification script to run, but no pass/fail results were ever recorded | Doc-only |
