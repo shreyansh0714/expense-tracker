@@ -267,19 +267,19 @@ both easy to find together later. Without this note it's easy to
 finish planning and skip committing the plan, since Plan Mode's own
 output file lives outside the repo by default.
 
-## Convention — verifying the implementation (⚠️ TODO, not yet wired up)
+## Convention — verifying the implementation
 
-Once Plan Mode finishes implementing a spec, verifying it against that
-spec's **Acceptance Criteria** / **Manual Verification Guide** must be
-delegated to a dedicated `verify` subagent — **the main agent must never
-verify its own implementation.** This is a placeholder convention only:
+Once a spec is built, **the main agent never verifies its own
+implementation.** Verification follows the SDD workflow in `CLAUDE.md`:
 
-- No `.claude/agents/verify.md` exists yet.
-- No hook fires it automatically after an implementation plan completes.
+1. **Validate** — hand the spec's Manual Verification Guide to the
+   developer to run by hand.
+2. **`/test-feature <spec-name>`** — `spendly-test-writer` writes tests
+   from this spec (never from the code), `spendly-test-runner` runs them.
+   Write the Acceptance Criteria so each item is testable: exact field
+   names, status codes, redirect targets and error messages. Anything
+   missing comes back as a `SPEC GAP:` line.
+3. **`/code-review-feature <spec-name>`** — `spendly-security-reviewer`
+   and `spendly-quality-reviewer` review the diff in parallel.
 
-Until both of those exist, the main agent should say so out loud and hand
-the spec's Manual Verification Guide to the user to run themselves, rather
-than quietly self-verifying. **This block is the one to update** when the
-`verify` subagent and its hook get built — replace this note with the
-actual subagent name/invocation and hook trigger once they exist, and keep
-the "main agent never self-verifies" rule regardless of the mechanism.
+Commit only when all three pass.

@@ -14,17 +14,27 @@ expense-tracker/
 ├── requirements.txt        # flask, werkzeug, pytest, pytest-flask
 ├── database/
 │   ├── __init__.py         # empty — makes `database` a package
-│   └── db.py                # STUB — sole data-access layer (get_db/init_db/seed_db), raw sqlite3
+│   └── db.py                # sole data-access layer (get_db/init_db/seed_db + query helpers), raw sqlite3
 ├── templates/
 │   ├── base.html            # Shared layout: nav, footer, font links, {% block title/head/content/scripts %}
 │   ├── landing.html          # extends base.html — marketing/home page
-│   ├── login.html            # extends base.html — sign-in form (renders only, no POST handler yet)
-│   ├── register.html         # extends base.html — sign-up form (renders only, no POST handler yet)
+│   ├── login.html            # extends base.html — sign-in form
+│   ├── register.html         # extends base.html — sign-up form
+│   ├── profile.html          # extends base.html — profile dashboard
 │   ├── terms.html            # extends base.html — static legal copy
 │   └── privacy.html          # extends base.html — static legal copy
-└── static/
-    ├── css/style.css         # Single stylesheet, CSS custom properties for design tokens
-    └── js/main.js            # Vanilla JS, no build step, no framework
+├── static/
+│   ├── css/style.css         # Single stylesheet, CSS custom properties for design tokens
+│   └── js/main.js            # Vanilla JS, no build step, no framework
+├── tests/
+│   ├── conftest.py           # shared fixtures: `client`/`auth_client` on a throwaway DB (never database.db)
+│   └── test_<spec-name>.py   # one file per spec, written by /test-feature
+└── .claude/
+    ├── specs/                # one spec per step (/create-spec)
+    ├── plans/                # one plan per spec (/implement-plan)
+    ├── commands/             # slash commands (see "Commands" below)
+    ├── agents/               # the 4 project subagents (see "Subagent policy")
+    └── PROGRESS.md           # route status, future features, known issues
 ```
 
 Where things belong:
@@ -71,6 +81,20 @@ Only what's already in `requirements.txt` — don't add new dependencies without
 - Any command that writes data (`INSERT`/`UPDATE`/`DELETE`, file writes, etc.) must NOT put that action in a `!` block. Instead, write the script in a plain fenced code block and instruct Claude to run it itself via its own Bash tool call — so it goes through normal tool permissions like any other write.
 - See `.claude/commands/seed-expense.md` for the pattern: the read-only `SELECT id, name, email FROM users` list uses `` !`sqlite3 ...` ``, while the `INSERT INTO expenses` script is a plain ` ```bash ` block Claude is told to run itself.
 
+## Moving content between files
+
+1. Add the content at the new place first.
+2. `grep` the new file for the section heading to confirm it's there.
+3. Only then delete it from the old place and write the pointer, in the
+   same commit.
+
+Never write "X lives in file Y" without that `grep` passing.
+
+- **Why:** commit `01a61ae` (2026-09-17) deleted the "Implemented vs stub
+  routes" table from this file and wrote "Route-by-route implemented/stub
+  status lives in `.claude/PROGRESS.md`" — but the table was never added
+  there. It stayed missing until the developer noticed on 2026-09-19.
+
 ## Verification hygiene
 
 - If Claude runs a command that writes data (`database.db`, or any file) to verify it works — rather than the user invoking it themselves — Claude must tell the user it did this, since it produces real rows/files indistinguishable from the user's own.
@@ -79,20 +103,25 @@ Only what's already in `requirements.txt` — don't add new dependencies without
 ## Subagent policy
 
 - Use a built-in `Explore` subagent for codebase exploration before implementing any non-trivial new feature.
-- Use a subagent to verify test results after an implementation, once tests exist.
 - When asked to plan, delegate codebase research to a subagent before presenting the plan.
 - Use the built-in `Plan` subagent when working in plan mode.
+- **The main agent never self-verifies a feature.** After Build, the
+  project's own subagents do the checking, always through their slash
+  command (see "Spec-Driven Development (SDD) workflow" below):
 
-> ⚠️ **TODO — verify subagent, not yet built.** Once a spec's implementation
-> plan finishes, verifying the feature against the spec's Acceptance
-> Criteria / Manual Verification Guide must be delegated to a dedicated
-> `verify` subagent — **the main agent must never self-verify.** This is a
-> placeholder rule only: there is no `.claude/agents/verify.md` and no hook
-> wiring it in automatically yet. Until that exists, the main agent should
-> say so explicitly and ask the user to verify manually (using the spec's
-> Manual Verification Guide — see "Spec verification convention" below)
-> instead of quietly verifying itself. Update this note when the `verify`
-> subagent and its hook are actually built.
+| Subagent (`.claude/agents/`) | Launched by | Job | Tools |
+|---|---|---|---|
+| `spendly-test-writer` | `/test-feature` step 1 | Writes `tests/test_<spec-name>.py` from the spec only | Read, Edit, Write, Grep, Glob |
+| `spendly-test-runner` | `/test-feature` step 2 | Runs that one file with `venv/bin/python -m pytest`, diagnoses failures | Read, Bash, Grep |
+| `spendly-security-reviewer` | `/code-review-feature` (parallel) | Security findings tagged Critical/High/Medium/Low — any finding blocks the commit | Read, Grep, Glob |
+| `spendly-quality-reviewer` | `/code-review-feature` (parallel) | Project-rule and maintainability review, ends with a verdict | Read, Grep, Glob |
+
+- Subagent files load when a session starts. After adding or editing one,
+  restart the session (`/exit`, then `claude --continue`) before relying on it.
+- There is no separate `verify` subagent: `/test-feature` covers what can
+  be checked automatically, and the developer's Manual Verification Guide
+  pass covers what has to be seen. Revisit once Playwright gives an agent
+  a real browser.
 
 ## Learning notes artifact
 
@@ -110,7 +139,8 @@ https://claude.ai/artifact/6vjCPWhWYkaTTQqTYzvqu3
   (prerequisite flag → why → analogy-first what → one concrete Spendly
   example → how it works → good practices → when to use/not → where
   else it shows up). Section 0 (project map) should get redrawn whenever
-  a row in the "Implemented vs stub routes" table below actually changes.
+  a row in the "Routes — implemented vs stub" table in `.claude/PROGRESS.md`
+  actually changes.
 - **Before re-explaining something from scratch in chat, check whether
   the artifact already covers it.** If it does, point the developer to
   that artifact section instead of retyping the explanation — the
@@ -133,9 +163,8 @@ https://claude.ai/artifact/6vjCPWhWYkaTTQqTYzvqu3
   (exact UI paths, exact commands, exact expected output) for verifying
   *each* acceptance-criteria item by hand. See
   `.claude/commands/create-spec.md` for the section this produces.
-- See the subagent policy above for who actually runs verification once an
-  implementation is done — that's a separate, currently-unbuilt piece
-  (the `verify` subagent), not this section.
+- The Manual Verification Guide is the "Validate" step of the SDD workflow
+  below; `/test-feature` and `/code-review-feature` run after it.
 
 ## Spec interview convention
 
@@ -239,11 +268,28 @@ https://claude.ai/artifact/6vjCPWhWYkaTTQqTYzvqu3
 
 ## Spec-Driven Development (SDD) workflow
 
-The developer's own working pattern for this project, named explicitly so
-it's a deliberate methodology rather than an implicit habit: **Spec**
-(what/why) → **Plan** (how) → **incremental build** → **Verify**. This is
-already how `/create-spec` and `/implement-plan` work — this section is
-the umbrella naming and the interview/verification standards under it.
+The developer's own working pattern for this project, run once per feature
+(one feature = one branch = one PR):
+
+```
+1. Git start    git switch main → git pull origin main → git checkout -b feature/<name>
+2. SDD          Spec → Review → Design → Review → Tasks → Build → Validate
+                (/create-spec)          (/implement-plan)        (Manual Verification Guide)
+3. Testing      /test-feature <spec-name>
+                  spendly-test-writer  → writes tests/test_<spec-name>.py from the spec only
+                  spendly-test-runner  → runs it, diagnoses failures → final summary
+4. Self review  /code-review-feature <spec-name>
+                  spendly-security-reviewer ┐ run in parallel on `git diff main`
+                  spendly-quality-reviewer  ┘ + new untracked files → unified report
+5. Git finish   flip the feature's row in PROGRESS.md's route table (Stub → Implemented)
+                → git commit → git push origin feature/<name> → create & merge PR
+                → git switch main → git pull → git branch -d feature/<name>
+```
+
+Each step must pass before the next one starts: failing tests go back to
+Build; a CHANGES REQUESTED review goes back to Build, then re-run Testing
+and Self review. Never commit (step 5) with failing tests or a CHANGES
+REQUESTED verdict.
 
 **Interview depth for spec/skill/command creation.** These three artifact
 types lock in decisions for a long time, so under-asking is expensive —
@@ -256,28 +302,32 @@ boundaries, naming/placement, and data shape. This standard applies to
 creating spec/skill/command files specifically — a small fix or tweak
 doesn't need the same interview depth.
 
-**Two verification gates, starting now** (not retroactive — Steps 1-4's
-already-shipped code isn't reopened to add this):
-- **Gate 1**: the Manual Verification Guide (the developer, by hand) —
-  *and* running the `/code-review` skill on the diff (Claude-driven).
-- **Gate 2**: automated `pytest` tests, aimed specifically at what a
-  manual pass might miss — cases that could break the app in a real
-  deployment. Before writing Gate 2 tests, interview the developer about
-  what the test should actually verify, so a test doesn't silently encode
-  a wrong guess about intent.
-- Alongside Gate 2, explicitly confirm the finished implementation matches
-  what the developer actually asked for — not a feature Claude quietly
-  built instead because it misread the intent. Ask directly if there's
-  any doubt; don't assume a technically-passing test means the right
-  thing got built.
+**The three checks after Build** (not retroactive — already-shipped steps
+aren't reopened to add them):
+
+| Check | Who runs it | What it catches | Blocks commit when |
+|---|---|---|---|
+| Validate | The developer, by hand, using the spec's Manual Verification Guide | Anything you have to see: layout, modals, animations | Any step doesn't match its expected output |
+| `/test-feature` | `spendly-test-writer` + `spendly-test-runner` | Behavior the spec promises: status codes, redirects, validation, DB side effects | Any test fails |
+| `/code-review-feature` | `spendly-security-reviewer` + `spendly-quality-reviewer` | Security holes and project-rule breaks in the changed code | Verdict is CHANGES REQUESTED (any security finding at all, or a quality project-rule break) |
+
+- **Tests come from the spec, not the code.** The test-writer never reads
+  `app.py` or `database/` — a test copied from the code would pass even
+  when the code is wrong. There is no pre-test interview: when the spec
+  leaves a detail out, the writer outputs `SPEC GAP: <what's missing>`
+  instead of guessing, and those lines are shown to the developer in the
+  `/test-feature` report. Fix the spec, then re-run.
+- **Tests never touch the real `database.db`.** `tests/conftest.py`
+  swaps `database.db.DB_PATH` to a throwaway file per test (pytest's
+  `monkeypatch` + `tmp_path`) and provides the shared `client` and
+  `auth_client` fixtures. Test files use these; they never define their own.
+- Alongside the checks, explicitly confirm the finished implementation
+  matches what the developer actually asked for — not a feature Claude
+  quietly built instead because it misread the intent. Ask directly if
+  there's any doubt; don't assume a technically-passing test means the
+  right thing got built.
 - Playwright end-to-end tests and a full CI/CD pipeline are explicitly
-  future work (not part of these two gates yet) — tracked in
-  `.claude/PROGRESS.md`'s Future Features table.
-- Subagent-driven verification (firing a subagent to check a feature
-  against its own spec's Acceptance Criteria) is the stated long-term
-  direction for Gate 1/2 both — see the `verify`-subagent TODO in
-  "Subagent policy" above. Not built yet; this section documents intent,
-  not a working mechanism.
+  future work — tracked in `.claude/PROGRESS.md`'s Future Features table.
 
 ## Plan checklists
 
@@ -287,16 +337,30 @@ already-shipped code isn't reopened to add this):
 
 ## Commands
 
-Run from `expense-tracker/` with the venv active:
+Run from `expense-tracker/`. Always run pytest through the venv's Python
+(`venv/bin/python -m pytest`) — a fresh shell, including a subagent's,
+doesn't have the venv active:
 
 ```bash
 source venv/bin/activate
-python app.py                       # dev server at http://localhost:5001 (debug=True)
-pytest                              # run tests (pytest-flask installed; no tests exist yet)
-pytest tests/test_x.py::test_name   # run a single test, once tests exist
-pytest -k "test_name"               # run a single test by name/keyword
-pytest -s                           # run tests with print output visible
+python app.py                                        # dev server at http://localhost:5001 (debug=True)
+venv/bin/python -m pytest                            # run all tests
+venv/bin/python -m pytest tests/test_x.py -v         # run one test file
+venv/bin/python -m pytest tests/test_x.py::test_name # run a single test
+venv/bin/python -m pytest -k "test_name"             # run tests by name/keyword
+venv/bin/python -m pytest -s                         # run tests with print output visible
 ```
+
+Workflow slash commands (`.claude/commands/`), in the order the SDD
+workflow uses them:
+
+| Command | What it does |
+|---|---|
+| `/create-spec` | Syncs with main, creates the feature branch, writes `.claude/specs/<NN>-<name>.md` |
+| `/implement-plan` | Turns a spec into a plan with a Design Plan and a `- [ ]` Tasks checklist |
+| `/test-feature <spec-name>` | Writes tests from the spec, runs them, reports pass/fail + any `SPEC GAP:` lines |
+| `/code-review-feature <spec-name>` | Parallel security + quality review of `git diff main` and new files, one unified verdict |
+| `/seed-user`, `/seed-expense` | Add dummy data to `database.db` for manual testing |
 
 No lint/format tooling is configured — don't assume `black`/`flake8`/`ruff` are available.
 
@@ -310,7 +374,7 @@ No lint/format tooling is configured — don't assume `black`/`flake8`/`ruff` ar
 - Passwords must go through Werkzeug's hashing helpers once auth is implemented — never store or compare plaintext passwords.
 - Keep route logic in `app.py` thin; don't scatter data-access code across templates or static JS.
 - Once a stub route's step is implemented, it should render a template — don't leave it returning a raw string.
-- **Do not implement a stub route unless the active task explicitly asks for that step.** Route-by-route implemented/stub status lives in `.claude/PROGRESS.md`, not here.
+- **Do not implement a stub route unless the active task explicitly asks for that step.** Route-by-route implemented/stub status lives in `.claude/PROGRESS.md` (section "Routes — implemented vs stub"), not here.
 
 ## Project status
 
