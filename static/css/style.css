@@ -122,6 +122,12 @@ a { color: inherit; text-decoration: none; }
 .nav-links a { color: var(--ink-muted); transition: color 0.2s; }
 .nav-links a:hover { color: var(--ink); }
 
+.nav-links a.nav-active {
+    color: var(--ink);
+    border-bottom: 2px solid var(--accent);
+    padding-bottom: 2px;
+}
+
 .nav-cta {
     background: var(--ink) !important;
     color: var(--paper) !important;
@@ -980,7 +986,8 @@ textarea.form-input {
 /* Profile page — paper-ledger polish (spendly-ui-polish)              */
 /* ------------------------------------------------------------------ */
 
-.profile-section {
+.profile-section,
+.coming-soon {
     position: relative;
     background-color: var(--paper);
     background-image: var(--crease), var(--crease-lines);
@@ -988,7 +995,8 @@ textarea.form-input {
     filter: contrast(1.05) saturate(.9);
 }
 
-.profile-section::after {
+.profile-section::after,
+.coming-soon::after {
     content: "";
     position: absolute;
     inset: 0;

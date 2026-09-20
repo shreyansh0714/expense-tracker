@@ -223,6 +223,15 @@ def privacy():
     return render_template("privacy.html")
 
 
+@app.route("/analytics")
+def analytics():
+    if "user_id" not in session:
+        flash("Please sign in to view analytics.", "error")
+        return redirect(url_for("login"))
+
+    return render_template("analytics.html")
+
+
 # ------------------------------------------------------------------ #
 # Placeholder routes — students will implement these                  #
 # ------------------------------------------------------------------ #

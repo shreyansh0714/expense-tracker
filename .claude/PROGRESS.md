@@ -26,6 +26,7 @@ unfinished. Flip a row to Implemented in the same commit that builds it.
 | `GET /privacy` | Implemented — renders `privacy.html` |
 | `GET/POST /profile` | Implemented — Steps 4-6, dashboard + edit modal + date filter (`?range=…`) |
 | `POST /profile/budget` | Implemented — Step 6 Revision 1, saves/removes the monthly budget from the budget card, redirects back to `/profile` with the current filter |
+| `GET /analytics` | Implemented — Analytics "coming soon" page, login-required (redirects to `login`) |
 | `GET /expenses/add` | Stub — Step 7 |
 | `GET /expenses/<id>/edit` | Stub — Step 8 |
 | `GET /expenses/<id>/delete` | Stub — Step 9 |
