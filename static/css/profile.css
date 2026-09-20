@@ -1,0 +1,292 @@
+/* ------------------------------------------------------------------ */
+/* Profile page — date filter + budget card (Step 6)                   */
+/* ------------------------------------------------------------------ */
+
+/* Sits on the page-level paper sheet (see .profile-section in style.css),
+   raised above its grain overlay like the cards are. */
+.date-filter,
+.range-summary,
+.range-note {
+    position: relative;
+    z-index: 1;
+}
+
+.date-filter {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem 1rem;
+    background: var(--paper-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+}
+
+.date-filter-presets,
+.date-filter-custom {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* thin divider between the presets and the From/To range */
+.date-filter-custom {
+    padding-left: 1rem;
+    border-left: 1px solid var(--border);
+}
+
+.date-filter-preset {
+    padding: 0.55rem 1.1rem;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: var(--paper-warm);
+    color: var(--ink-soft);
+    font-family: var(--font-body);
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.date-filter-preset:hover { background: var(--border-soft); }
+
+.date-filter-preset[aria-pressed="true"] {
+    background: var(--accent);
+    color: var(--paper);
+}
+
+.date-filter-apply {
+    padding: 0.55rem 1.4rem;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: var(--accent);
+    color: var(--paper);
+    font-family: var(--font-body);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.date-filter-apply:hover { background: var(--ink); }
+
+.date-filter-custom label {
+    font-size: 0.85rem;
+    color: var(--ink-muted);
+}
+
+.date-filter-custom .form-input {
+    width: auto;
+    padding: 0.45rem 0.7rem;
+    background: var(--paper);
+    border-color: var(--border);
+}
+
+.date-filter-preset:focus-visible,
+.date-filter-apply:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.range-summary {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-size: 1.05rem;
+    color: var(--ink-soft);
+}
+
+.range-note {
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+    background: var(--accent-2-light);
+    border-left: 3px solid var(--accent-2);
+    border-radius: var(--radius-sm);
+    padding: 0.5rem 0.875rem;
+}
+
+/* --- Month-by-month budget table --- */
+
+.tilt-g { transform: rotate(-0.4deg); }
+
+.budget-table-caption {
+    margin-top: 0.75rem;
+    font-size: 0.8rem;
+    color: var(--ink-muted);
+}
+
+@media (max-width: 800px) {
+    .date-filter { flex-direction: column; align-items: flex-start; }
+}
+
+/* --- Month-by-month budget table: boxed grid (Revision 1) --- */
+
+.budget-table {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    border-collapse: separate;
+    border-spacing: 0;
+    overflow: hidden;
+}
+
+.budget-table th {
+    background: var(--accent-light);
+    color: var(--accent);
+}
+
+.budget-table th,
+.budget-table td {
+    padding: 0.7rem 1rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.budget-table th + th,
+.budget-table td + td {
+    border-left: 1px solid var(--border);
+}
+
+.budget-table tr:last-child td { border-bottom: none; }
+
+/* --- Summary row: "Showing …" + pill on the left, budget card on the right --- */
+
+.filter-summary-row {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: flex-start;
+    gap: 1.5rem;
+}
+
+.filter-summary {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    padding-top: 0.35rem;
+}
+
+.range-pill {
+    display: inline-block;
+    margin-left: 0.5rem;
+    padding: 0.2rem 0.75rem;
+    border-radius: 999px;
+    background: var(--accent);
+    color: var(--paper);
+    font-family: var(--font-body);
+    font-style: normal;
+    font-size: 0.8rem;
+    font-weight: 500;
+    vertical-align: middle;
+}
+
+/* --- Budget card: same paper/hand-drawn treatment as the other cards --- */
+
+.budget-card-wrap {
+    width: 320px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+.tilt-h { transform: rotate(0.35deg); }
+
+.budget-card {
+    position: relative;
+    z-index: 1;
+    background: var(--paper-card);
+    border-radius: var(--radius-md);
+    padding: 1.1rem 1.25rem;
+}
+
+.budget-card summary {
+    list-style: none;
+    cursor: pointer;
+}
+
+.budget-card summary::-webkit-details-marker { display: none; }
+
+.budget-card-add,
+.budget-card-edit-btn {
+    display: inline-block;
+    padding: 0.4rem 0.9rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--paper);
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--ink-soft);
+}
+
+.budget-card-add:hover,
+.budget-card-edit-btn:hover { background: var(--paper-warm); }
+
+.budget-card[open] .budget-card-add,
+.budget-card-edit[open] .budget-card-edit-btn { margin-bottom: 0.9rem; }
+
+.budget-card-title { font-size: 1rem; }
+
+.budget-card-amount {
+    font-family: var(--font-display);
+    font-size: 1.9rem;
+    color: var(--ink);
+    margin: 0.2rem 0 0.6rem;
+}
+
+.budget-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+.budget-form-label {
+    font-size: 0.85rem;
+    color: var(--ink-muted);
+}
+
+.budget-input-group { display: flex; }
+
+.budget-input-prefix {
+    display: flex;
+    align-items: center;
+    padding: 0 0.8rem;
+    border: 1px solid var(--border);
+    border-right: none;
+    border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+    background: var(--paper-warm);
+    color: var(--ink-soft);
+}
+
+.budget-input-group .form-input {
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+.budget-save-btn {
+    padding: 0.6rem 1rem;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: var(--accent);
+    color: var(--paper);
+    font-family: var(--font-body);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.budget-save-btn:hover { background: var(--ink); }
+
+.budget-card summary:focus-visible,
+.budget-save-btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.budget-tip {
+    font-size: 0.78rem;
+    color: var(--ink-muted);
+    padding: 0 0.25rem;
+}
+
+@media (max-width: 800px) {
+    .date-filter-custom { padding-left: 0; border-left: none; }
+    .filter-summary-row { flex-direction: column; }
+    .budget-card-wrap { width: 100%; }
+}

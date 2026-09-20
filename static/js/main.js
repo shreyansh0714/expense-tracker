@@ -109,3 +109,21 @@
         el.addEventListener("click", closeModal);
     });
 })();
+
+// Profile: open the date filter's calendar when anywhere on a From/To box is clicked
+// (by default Chrome only opens it from the small calendar icon)
+(function () {
+    var inputs = document.querySelectorAll('.date-filter-custom input[type="date"]');
+    if (!inputs.length) return;
+
+    inputs.forEach(function (input) {
+        input.addEventListener("click", function () {
+            if (typeof input.showPicker !== "function") return;
+            try {
+                input.showPicker();
+            } catch (e) {
+                // Picker already open or not allowed here: the icon still works
+            }
+        });
+    });
+})();

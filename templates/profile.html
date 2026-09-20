@@ -2,6 +2,10 @@
 
 {% block title %}Profile — Spendly{% endblock %}
 
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/profile.css') }}">
+{% endblock %}
+
 {% block content %}
 
 <svg width="0" height="0" style="position:absolute">
@@ -40,6 +44,80 @@
     <div class="auth-error profile-error">{{ error }}</div>
     {% endif %}
 
+    <div class="date-filter">
+        <form method="GET" action="{{ url_for('profile') }}" class="date-filter-presets">
+            {% for key, label in [("this_month", "This month"), ("last_month", "Last month"), ("last_3_months", "Last 3 months"), ("all_time", "All time")] %}
+            <button type="submit" name="range" value="{{ key }}" class="date-filter-preset"
+                    aria-pressed="{{ 'true' if active_range == key else 'false' }}">{{ label }}</button>
+            {% endfor %}
+        </form>
+        <form method="GET" action="{{ url_for('profile') }}" class="date-filter-custom">
+            <input type="hidden" name="range" value="custom">
+            <label for="range-start">From</label>
+            <input type="date" id="range-start" name="start" class="form-input" max="{{ today.isoformat() }}"
+                   value="{{ range_start.isoformat() if active_range == 'custom' else '' }}">
+            <label for="range-end">To</label>
+            <input type="date" id="range-end" name="end" class="form-input" max="{{ today.isoformat() }}"
+                   value="{{ range_end.isoformat() if active_range == 'custom' else '' }}">
+            <button type="submit" class="date-filter-apply"
+                    aria-pressed="{{ 'true' if active_range == 'custom' else 'false' }}">Apply</button>
+        </form>
+    </div>
+
+    {% macro budget_form() %}
+    <form method="POST" action="{{ url_for('save_budget') }}" class="budget-form">
+        <input type="hidden" name="range" value="{{ active_range }}">
+        {% if active_range == 'custom' %}
+        <input type="hidden" name="start" value="{{ range_start.isoformat() }}">
+        <input type="hidden" name="end" value="{{ range_end.isoformat() }}">
+        {% endif %}
+        <label for="budget-input" class="budget-form-label">Monthly budget</label>
+        <div class="budget-input-group">
+            <span class="budget-input-prefix">₹</span>
+            <input type="text" id="budget-input" name="monthly_budget" class="form-input"
+                   inputmode="decimal" placeholder="e.g. 10,000" value="{{ budget_input }}">
+        </div>
+        <button type="submit" class="budget-save-btn">Save budget</button>
+    </form>
+    {% endmacro %}
+
+    <div class="filter-summary-row">
+        <div class="budget-card-wrap">
+            <div class="hand-drawn tilt-h">
+                <svg preserveAspectRatio="none">
+                    <rect x="1.5%" y="4%" width="97%" height="91%" rx="8" fill="none" stroke="var(--ink)" stroke-width="1.5" filter="url(#hand-drawn)"></rect>
+                </svg>
+                {% if budget_amount is none %}
+                <details class="budget-card">
+                    <summary class="budget-card-add">+ Add monthly budget</summary>
+                    {{ budget_form() }}
+                </details>
+                {% else %}
+                <div class="budget-card">
+                    <h2 class="profile-card-title budget-card-title">Monthly budget</h2>
+                    <p class="budget-card-amount">₹{{ budget_amount|inr }}</p>
+                    <details class="budget-card-edit">
+                        <summary class="budget-card-edit-btn">&#9998; Edit</summary>
+                        {{ budget_form() }}
+                    </details>
+                </div>
+                {% endif %}
+            </div>
+            <p class="budget-tip">Your current budget is used for every month in a multi-month view.</p>
+        </div>
+        <div class="filter-summary">
+            {% if filter_error %}
+            <div class="auth-error profile-error">{{ filter_error }}</div>
+            {% endif %}
+            {% if range_note %}
+            <p class="range-note">{{ range_note }}</p>
+            {% endif %}
+            <p class="range-summary">Showing {{ range_start.day }} {{ range_start.strftime('%b %Y') }} – {{ range_end.day }} {{ range_end.strftime('%b %Y') }}
+                <span class="range-pill">{{ range_label }}</span></p>
+        </div>
+
+    </div>
+
     <div class="profile-stats-row">
         <div class="hand-drawn tilt-b">
             <svg preserveAspectRatio="none">
@@ -47,9 +125,9 @@
             </svg>
             <div class="stat-tile">
                 <span class="stat-tile-label">Total Spent</span>
-                <span class="stat-tile-value">₹{{ "%.2f"|format(monthly_total) }}</span>
-                {% if budget_amount is not none %}
-                <span class="stat-tile-subtext">₹{{ "%.2f"|format(monthly_total) }} of ₹{{ "%.2f"|format(budget_amount) }} budget used</span>
+                <span class="stat-tile-value">₹{{ monthly_total|inr }}</span>
+                {% if show_budget_subtext %}
+                <span class="stat-tile-subtext">₹{{ monthly_total|inr }} of ₹{{ budget_amount|inr }} budget used</span>
                 {% endif %}
             </div>
         </div>
@@ -72,6 +150,38 @@
             </div>
         </div>
     </div>
+
+    {% if monthly_budget_rows %}
+    <div class="hand-drawn tilt-g">
+        <svg preserveAspectRatio="none">
+            <rect x="1%" y="3%" width="98%" height="93%" rx="10" fill="none" stroke="var(--ink)" stroke-width="1.6" filter="url(#hand-drawn)"></rect>
+        </svg>
+        <div class="auth-card budget-table-card">
+            <h2 class="profile-card-title">Month-by-month budget</h2>
+            <table class="transactions-table budget-table">
+                <thead>
+                    <tr>
+                        <th>Month</th>
+                        <th>Budget</th>
+                        <th>Spent</th>
+                        <th>% used</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in monthly_budget_rows %}
+                    <tr>
+                        <td>{{ row.month_label }}</td>
+                        <td>₹{{ row.budget|inr }}</td>
+                        <td>₹{{ row.spent|inr }}</td>
+                        <td>{{ "—" if row.percent is none else row.percent ~ "%" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <p class="budget-table-caption">Uses your current monthly budget for every month.</p>
+        </div>
+    </div>
+    {% endif %}
 
     <div class="profile-content-grid">
 
@@ -97,13 +207,13 @@
                         <td>{{ expense.date }}</td>
                         <td>{{ expense.description or "—" }}</td>
                         <td><span class="category-pill" data-category="{{ expense.category|lower }}">{{ expense.category }}</span></td>
-                        <td>₹{{ "%.2f"|format(expense.amount) }}</td>
+                        <td>₹{{ expense.amount|inr }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
             {% else %}
-            <p class="profile-empty-state">No expenses logged yet.</p>
+            <p class="profile-empty-state">No expenses in this period.</p>
             {% endif %}
         </div>
         </div>
@@ -119,7 +229,7 @@
                 <div class="category-bar-row">
                     <div class="category-bar-label">
                         <span>{{ row.category }}</span>
-                        <span>₹{{ "%.2f"|format(row.total) }}</span>
+                        <span>₹{{ row.total|inr }}</span>
                     </div>
                     <div class="category-bar">
                         <div class="category-bar-fill" data-category="{{ row.category|lower }}"
@@ -128,7 +238,7 @@
                 </div>
                 {% endfor %}
             {% else %}
-            <p class="profile-empty-state">No expenses logged this month yet.</p>
+            <p class="profile-empty-state">No expenses in this period.</p>
             {% endif %}
         </div>
         </div>
@@ -154,12 +264,6 @@
                     <input type="email" id="email" name="email"
                            class="form-input" value="{{ email }}"
                            data-original-email="{{ original_email }}" required>
-                </div>
-                <div class="form-group">
-                    <label for="monthly_budget">Monthly budget (₹)</label>
-                    <input type="text" id="monthly_budget" name="monthly_budget"
-                           class="form-input" value="{{ monthly_budget }}"
-                           placeholder="e.g. 15000">
                 </div>
                 <div class="form-group">
                     <label for="current_password">Current password</label>

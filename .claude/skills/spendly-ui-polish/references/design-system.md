@@ -298,6 +298,16 @@ and let it grow on interaction — pure CSS, no JS:
 - Touch `--accent`, `--accent-2`, `--danger`, or any existing token —
   extend the palette, never replace a value already in use elsewhere.
 - Add a dependency, build step, or JS framework — vanilla CSS/HTML/JS only.
+- **Never copy a reference image's annotation marks.** A mockup or
+  infographic often adds marks whose only job is to point at things:
+  dashed/glowing outlines highlighting where an element sits, numbered
+  circles (①②③), arrows, brackets, "step" labels, and tinted callout
+  boxes around a step. These are explanation, not UI. Build the element
+  in the page's own treatment (hand-drawn border, paper background,
+  existing tokens) and drop the marks entirely. Added 2026-09-20 after
+  the Step 6 budget card copied `monthly-budget-add-edit-infographic.png`'s
+  dashed green outline and green fill onto the real page; the developer's
+  verdict: it "feels very out of place".
 - **Copy the mockup's look, never its words.** The paper-ledger moodboard
   linked at the top of this file is a design reference, not a content
   source — its text is fake, written only to make the mockup look
