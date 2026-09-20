@@ -1,854 +1,703 @@
-"""Tests for spec 06 — Date filter on the Profile dashboard.
+"""Tests for the /profile date-range filter (spec 06), read together with
+spec 06b (profile-dashboard-restructure) wherever 06 is marked
+"[Superseded by spec 06b.]" — those markers, not the "Originally:" text
+that follows them, define the current expected behaviour tested here.
 
-Written from `.claude/specs/06-date-time-filter.md` only. Test data (dated
-expenses, monthly_budget, second users) is inserted through the throwaway DB
-that `tests/conftest.py`'s `client`/`auth_client` fixtures already point
-`database.db.DB_PATH` at — never the real `database.db`.
-
-Money strings use FR11's format (Revision 1, 2026-09-20): Indian digit
-grouping (last 3 digits, then 2s) plus 2 decimals, e.g. `₹10,000.00` and
-`₹1,00,000.00` for a lakh — built by `_money()`/`_indian_group()` below,
-never Python's `f"{x:,.2f}"`, which is international grouping and only
-looks the same below a lakh. "Showing ..." / note dates use `%d %b %Y`
-per FR4, but FR4's own worked example ("Showing 1 Jul 2026 - 19 Sep 2026")
-is NOT zero-padded, contradicting `%d`'s zero-padding — see SPEC GAP
-below. Tests therefore accept either the zero-padded or unpadded day when
-matching those lines.
-
-All response bodies are read through `page_text()`, which HTML-unescapes
-the decoded body before any substring check. Jinja autoescapes text nodes,
-so a straight apostrophe or `&` in an expected message (e.g. "there's")
-would otherwise show up in the raw response as `there&#39;s` and fail a
-literal match — `page_text()`/`html.unescape` is the one place that's
-handled, so every test compares against plain, human-readable text.
-
-Revision 1 (2026-09-20) additions covered here: FR8 (budget field removed
-from the edit-profile popup), FR9 (`POST /profile/budget`, the budget
-card, its toasts), FR10 (active-range pill), FR11 (comma money format).
-FR12/FR13 are look-only / a manual calendar click, so no automated tests
-(AC20 is manual only, matching FR13). See SPEC GAP notes below and near
-the relevant tests for the edit-profile-popup route/field names, which
-Revision 1 still doesn't give.
+These tests never read app.py or database/db.py. Expense rows are inserted
+directly with parameterised SQL against the throwaway file conftest.py
+points database.db.DB_PATH at (via the client/auth_client fixtures) — the
+exact `expenses` and `users` column names used below (user_id, amount,
+category, date, description / id, email, monthly_budget, created_at) are
+taken verbatim from spec text (06b's own manual-verification SQL and 06's
+APIs section), not from reading the implementation.
 """
 
-import calendar
-import html
+import html as html_module
 import re
+import sqlite3
 from datetime import date, timedelta
 
 import pytest
 
-from database import db
-
-RUPEE = "₹"
-
+from app import app as flask_app
+from database import db as db_module
 
 # ------------------------------------------------------------------ #
-# DB / formatting helpers (test setup only — never used to read app.py
-# or database/, only to write rows for a test's own scenario)
+# Test-only DB + formatting helpers (not implementation code)         #
 # ------------------------------------------------------------------ #
 
-def _get_user_id(email):
-    conn = db.get_db()
+
+def _get_conn():
+    conn = sqlite3.connect(db_module.DB_PATH)
+    conn.execute("PRAGMA foreign_keys = ON")
+    return conn
+
+
+def get_user_id(email="test@example.com"):
+    conn = _get_conn()
     row = conn.execute("SELECT id FROM users WHERE email = ?", (email,)).fetchone()
+    conn.close()
+    assert row is not None, f"no user row found for {email}"
+    return row[0]
+
+
+def get_monthly_budget(email="test@example.com"):
+    conn = _get_conn()
+    row = conn.execute(
+        "SELECT monthly_budget FROM users WHERE email = ?", (email,)
+    ).fetchone()
     conn.close()
     return row[0]
 
 
-def _insert_expense(user_id, amount, category, expense_date, description="expense"):
-    conn = db.get_db()
+def add_expense(user_id, amount, category, expense_date, description="test expense"):
+    conn = _get_conn()
     conn.execute(
         "INSERT INTO expenses (user_id, amount, category, date, description) "
         "VALUES (?, ?, ?, ?, ?)",
-        (user_id, amount, category, expense_date.isoformat(), description),
+        (user_id, amount, category, expense_date, description),
     )
     conn.commit()
     conn.close()
 
 
-def _set_budget(user_id, budget):
-    conn = db.get_db()
-    conn.execute("UPDATE users SET monthly_budget = ? WHERE id = ?", (budget, user_id))
-    conn.commit()
-    conn.close()
+def fmt(d):
+    """spec's `%d %b %Y` date text with no leading zero on the day, e.g.
+    '1 Jul 2026', '19 Sep 2026' (see spec 06 FR4 and 06b FR9 examples)."""
+    return f"{d.day} {d.strftime('%b %Y')}"
 
 
-def _indian_group(int_str):
-    """Indian digit grouping on an integer-part string: the last 3 digits
-    are one group, everything above is grouped in 2s (e.g. "1234567" ->
-    "12,34,567")."""
-    if len(int_str) <= 3:
-        return int_str
-    last3 = int_str[-3:]
-    rest = int_str[:-3]
-    groups = []
-    while len(rest) > 2:
-        groups.insert(0, rest[-2:])
-        rest = rest[:-2]
-    if rest:
-        groups.insert(0, rest)
-    return ",".join(groups) + "," + last3
-
-
-def _money(amount):
-    """FR11 (Revision 1): Indian digit grouping + 2 decimals, e.g.
-    '1,00,000.00' for a lakh — NOT Python's f"{x:,.2f}", which is
-    international grouping ('100,000.00') and must not be used here."""
+def money(amount):
+    """Indian digit grouping with 2 decimals and a rupee prefix, per spec 06
+    FR11: '₹89.99', '₹1,000.00', '₹10,000.00', '₹1,00,000.00',
+    '₹12,34,567.50', '₹1,23,45,678.00'."""
+    s = f"{abs(amount):.2f}"
+    int_part, dec_part = s.split(".")
+    if len(int_part) <= 3:
+        grouped = int_part
+    else:
+        last3, rest = int_part[-3:], int_part[:-3]
+        parts = []
+        while len(rest) > 2:
+            parts.insert(0, rest[-2:])
+            rest = rest[:-2]
+        if rest:
+            parts.insert(0, rest)
+        grouped = ",".join(parts) + "," + last3
     sign = "-" if amount < 0 else ""
-    int_part, dec_part = f"{abs(amount):.2f}".split(".")
-    return f"{sign}{_indian_group(int_part)}.{dec_part}"
+    return f"{sign}₹{grouped}.{dec_part}"
 
 
-def _budget_subtext(spent, budget):
-    return f"{RUPEE}{_money(spent)} of {RUPEE}{_money(budget)} budget used"
-
-
-def page_text(resp):
-    """HTML-unescape the decoded response body so tests can match plain
-    text (e.g. "there's") regardless of Jinja autoescaping turning it into
-    an entity (e.g. "there&#39;s")."""
-    return html.unescape(resp.data.decode())
-
-
-def pill_text(resp):
-    """FR10: the active-range pill is `<span class="range-pill">…</span>`,
-    distinct from the preset buttons that carry the same words."""
-    match = re.search(r'<span class="range-pill">(.*?)</span>', page_text(resp))
-    return match.group(1).strip() if match else None
-
-
-def _first_of_month(d):
+def first_of_month(d):
     return d.replace(day=1)
 
 
-def _last_day_of_month(d):
-    return d.replace(day=calendar.monthrange(d.year, d.month)[1])
+def last_of_previous_month(d):
+    return first_of_month(d) - timedelta(days=1)
 
 
-def _months_ago_first(d, months):
-    """1st of the month `months` months before d's month."""
-    total = d.year * 12 + (d.month - 1) - months
-    year, month = divmod(total, 12)
-    return date(year, month + 1, 1)
+def first_of_previous_month(d):
+    return first_of_month(last_of_previous_month(d))
 
 
-def _add_months(d, months):
-    total = d.year * 12 + (d.month - 1) + months
-    year, month = divmod(total, 12)
-    day = min(d.day, calendar.monthrange(year, month + 1)[1])
-    return date(year, month + 1, day)
+def first_of_month_n_back(d, n):
+    month, year = d.month - n, d.year
+    while month <= 0:
+        month += 12
+        year -= 1
+    return date(year, month, 1)
 
 
-def _date_variants(d):
-    """Both the zero-padded (%d %b %Y) and unpadded forms — see module
-    docstring SPEC GAP about FR4's contradictory example."""
-    padded = d.strftime("%d %b %Y")
-    unpadded = f"{d.day} {d.strftime('%b %Y')}"
-    return padded, unpadded
-
-
-def assert_date_in_text(text, d, msg=None):
-    padded, unpadded = _date_variants(d)
-    assert padded in text or unpadded in text, (
-        msg or f"expected formatted date {d.isoformat()} ({padded!r} or {unpadded!r}) in response"
+def has_control_with_value(html, value):
+    """True if a `name="range" value="<value>"` control exists, in either
+    attribute order (spec 06 AC2)."""
+    pattern = (
+        rf'(?:name="range"[^>]*value="{re.escape(value)}"'
+        rf'|value="{re.escape(value)}"[^>]*name="range")'
     )
+    return re.search(pattern, html) is not None
+
+
+# Jinja autoescapes template variables/text, so a literal apostrophe or
+# quote in an expected string (e.g. "there's", "haven't") comes back from
+# the response body as an HTML entity ("there&#39;s"). Every assertion in
+# this file reads the page through html_of(), which unescapes the decoded
+# body, so a bare `resp.data.decode()` is never used directly in a test.
+def html_of(resp):
+    return html_module.unescape(resp.data.decode())
 
 
 # ------------------------------------------------------------------ #
-# AC1, AC2 — defaults + filter bar markup
+# Auth guard                                                          #
 # ------------------------------------------------------------------ #
 
-class TestFilterBarAndDefaults:
-    def test_no_params_defaults_to_this_month_and_marks_it_active(self, auth_client):
-        """AC1: GET /profile with no params -> 200, This month figures, This
-        month preset carries aria-pressed="true"."""
-        user_id = _get_user_id("test@example.com")
-        today = date.today()
-        _set_budget(user_id, 5000)
-        _insert_expense(user_id, 500, "Food", today, "this month expense")
 
-        resp = auth_client.get("/profile")
-        text = page_text(resp)
+class TestAuthGuard:
+    def test_profile_get_requires_login_redirects_to_login(self, client):
+        resp = client.get("/profile")
+        assert resp.status_code == 302, "logged-out /profile must redirect, not 200"
+        assert "/login" in resp.headers["Location"]
 
-        assert resp.status_code == 200
-        assert 'aria-pressed="true"' in text, "expected an active preset marker"
-        assert _budget_subtext(500, 5000) in text, (
-            "This month spend should be 500.00 of the 5000.00 budget"
-        )
-
-    def test_filter_bar_has_four_presets_and_custom_range_inputs(self, auth_client):
-        """AC2: 4 preset buttons (this_month/last_month/last_3_months/
-        all_time), From/To date inputs named start/end, and an Apply
-        button submitting range=custom."""
-        resp = auth_client.get("/profile")
-        text = page_text(resp)
-
-        for label in ("This month", "Last month", "Last 3 months", "All time"):
-            assert label in text, f"expected preset label {label!r} in filter bar"
-        for value in (
-            'value="this_month"',
-            'value="last_month"',
-            'value="last_3_months"',
-            'value="all_time"',
-        ):
-            assert value in text, f"expected range value {value!r} in filter bar"
-        assert 'name="start"' in text
-        assert 'name="end"' in text
-        assert 'type="date"' in text
-        assert 'value="custom"' in text, "expected the hidden range=custom field"
-        assert "Apply" in text
-
-
-# ------------------------------------------------------------------ #
-# AC3-AC6, AC8 — preset/custom range correctness
-# ------------------------------------------------------------------ #
-
-class TestRangeCorrectness:
-    def test_last_month_includes_only_previous_calendar_month(self, auth_client):
-        """AC3: ?range=last_month totals include only expenses dated in the
-        previous calendar month."""
-        user_id = _get_user_id("test@example.com")
-        today = date.today()
-        _set_budget(user_id, 100000)
-        last_month_first = _months_ago_first(today, 1)
-        last_month_last = _last_day_of_month(last_month_first)
-        this_month_first = _first_of_month(today)
-
-        _insert_expense(user_id, 400, "Food", last_month_first, "last month start")
-        _insert_expense(user_id, 600, "Food", last_month_last, "last month end")
-        _insert_expense(user_id, 900, "Food", this_month_first, "this month - excluded")
-
-        resp = auth_client.get("/profile?range=last_month")
-        text = page_text(resp)
-
-        assert resp.status_code == 200
-        assert _budget_subtext(1000, 100000) in text
-        assert _money(900) not in text
-
-    def test_last_3_months_includes_start_excludes_day_before(self, auth_client):
-        """AC4: ?range=last_3_months includes the 1st of the month two
-        months back through today, and excludes the day before that."""
-        user_id = _get_user_id("test@example.com")
-        today = date.today()
-        _set_budget(user_id, 100000)
-        range_start = _months_ago_first(today, 2)
-        day_before = range_start - timedelta(days=1)
-
-        _insert_expense(user_id, 300, "Food", range_start, "range start - included")
-        _insert_expense(user_id, 700, "Food", day_before, "day before - excluded")
-
-        resp = auth_client.get("/profile?range=last_3_months")
-        text = page_text(resp)
-
-        assert resp.status_code == 200
-        assert_date_in_text(text, range_start, "Showing line should start at the 3-month range start")
-        assert_date_in_text(text, today, "Showing line should end at today")
-        assert range_start.strftime("%b %Y") in text
-        assert _money(300) in text
-        assert _money(700) not in text
-
-    def test_all_time_includes_expense_before_signup(self, auth_client):
-        """AC5: ?range=all_time includes every expense, including one dated
-        before users.created_at (the account was just created "today")."""
-        user_id = _get_user_id("test@example.com")
-        today = date.today()
-        _set_budget(user_id, 100000)
-        old_date = today - timedelta(days=400)
-
-        _insert_expense(user_id, 250, "Food", old_date, "before signup")
-        _insert_expense(user_id, 750, "Food", today, "today")
-
-        resp = auth_client.get("/profile?range=all_time")
-        text = page_text(resp)
-
-        assert resp.status_code == 200
-        # history start = min(created_at date [today], oldest expense date) = old_date
-        assert_date_in_text(text, old_date, "Showing line should start at history start (the old expense's date)")
-        assert "when your records begin" not in text, "presets never show the case-(a) note (FR6)"
-        assert old_date.strftime("%b %Y") in text
-        assert _money(250) in text
-
-    def test_custom_range_bounds_are_inclusive(self, auth_client):
-        """AC6: ?range=custom&start=X&end=Y includes X and Y inclusive,
-        excludes X-1 and Y+1."""
-        user_id = _get_user_id("test@example.com")
-        today = date.today()
-        _set_budget(user_id, 100000)
-        x = today - timedelta(days=10)
-        y = today - timedelta(days=5)
-        before_x = x - timedelta(days=1)
-        after_y = y + timedelta(days=1)
-
-        _insert_expense(user_id, 150, "Food", x, "on start - included")
-        _insert_expense(user_id, 275, "Food", y, "on end - included")
-        _insert_expense(user_id, 999, "Food", before_x, "before start - excluded")
-        _insert_expense(user_id, 888, "Food", after_y, "after end - excluded")
-
-        resp = auth_client.get(f"/profile?range=custom&start={x.isoformat()}&end={y.isoformat()}")
-        text = page_text(resp)
-
-        assert resp.status_code == 200
-        assert _money(999) not in text, "expense before custom start must be excluded"
-        assert _money(888) not in text, "expense after custom end must be excluded"
-        if (x.year, x.month) == (y.year, y.month):
-            assert _budget_subtext(150 + 275, 100000) in text
-        else:
-            assert _money(150) in text
-            assert _money(275) in text
-
-    def test_custom_single_day_range_is_valid(self, auth_client):
-        """Edge case: start == end (a single day) is valid and shows only
-        that day."""
-        user_id = _get_user_id("test@example.com")
-        today = date.today()
-        _set_budget(user_id, 100000)
-        target_day = today - timedelta(days=3)
-
-        _insert_expense(user_id, 650, "Food", target_day, "the day")
-        _insert_expense(user_id, 700, "Food", target_day - timedelta(days=1), "day before - excluded")
-        _insert_expense(user_id, 800, "Food", target_day + timedelta(days=1), "day after - excluded")
-
-        resp = auth_client.get(
-            f"/profile?range=custom&start={target_day.isoformat()}&end={target_day.isoformat()}"
-        )
-        text = page_text(resp)
-
-        assert resp.status_code == 200
-        assert _budget_subtext(650, 100000) in text
-        assert _money(700) not in text
-        assert _money(800) not in text
-
-    def test_other_users_expenses_never_appear(self, auth_client):
-        """AC8: another user's expenses never appear in any filtered
-        figure."""
-        user_a_id = _get_user_id("test@example.com")
-        today = date.today()
-        _set_budget(user_a_id, 100000)
-        _insert_expense(user_a_id, 300, "Food", today, "user A expense")
-
-        auth_client.post(
-            "/register",
-            data={"name": "Other User", "email": "other@example.com", "password": "otherpass1"},
-        )
-        auth_client.post("/login", data={"email": "other@example.com", "password": "otherpass1"})
-        user_b_id = _get_user_id("other@example.com")
-        _insert_expense(user_b_id, 99999, "Food", today, "user B expense")
-
-        # back to user A
-        auth_client.post("/login", data={"email": "test@example.com", "password": "testpass1"})
-        resp = auth_client.get("/profile?range=all_time")
-        text = page_text(resp)
-
-        assert resp.status_code == 200
-        assert _budget_subtext(300, 100000) in text
-        assert _money(99999) not in text
-
-    def test_total_spent_is_not_capped_at_five(self, auth_client):
-        """Context for AC7: the Total Spent figure reflects every expense in
-        range, not just the 5-row Recent Transactions preview. (The exact
-        markup for Recent Transactions rows isn't specified by the spec —
-        see SPEC GAP; row count/ordering isn't asserted here.)"""
-        user_id = _get_user_id("test@example.com")
-        today = date.today()
-        _set_budget(user_id, 100000)
-        total = 0
-        for i in range(7):
-            amt = 100 + i
-            total += amt
-            _insert_expense(user_id, amt, "Food", today, f"expense {i}")
-
-        resp = auth_client.get("/profile")
-        text = page_text(resp)
-
-        assert resp.status_code == 200
-        assert _budget_subtext(total, 100000) in text
-
-
-# ------------------------------------------------------------------ #
-# AC9 — validation errors
-# ------------------------------------------------------------------ #
-
-class TestFilterErrors:
-    @pytest.mark.parametrize(
-        "query, expected_message",
-        [
-            ("range=bogus", "Unknown date range."),
-            ("range=custom&start=2026-09-01", "Please choose both a start and an end date."),
-            ("range=custom&start=&end=2026-09-10", "Please choose both a start and an end date."),
-            ("range=custom&start=abc&end=2026-09-10", "Please enter valid dates."),
-            ("range=custom&start=2026-02-30&end=2026-03-01", "Please enter valid dates."),
-        ],
-    )
-    def test_static_error_inputs_return_200_with_message_and_this_month_fallback(
-        self, auth_client, query, expected_message
-    ):
-        resp = auth_client.get(f"/profile?{query}")
-        text = page_text(resp)
-        assert resp.status_code == 200, "invalid filter input must never produce a 4xx"
-        assert expected_message in text
-        assert 'aria-pressed="true"' in text, "should fall back to This month, which is marked active"
-
-    def test_start_after_end_shows_error(self, auth_client):
-        today = date.today()
-        start = today.isoformat()
-        end = (today - timedelta(days=1)).isoformat()
-        resp = auth_client.get(f"/profile?range=custom&start={start}&end={end}")
-        text = page_text(resp)
-        assert resp.status_code == 200
-        assert "Start date must be on or before end date." in text
-
-    def test_start_after_today_shows_future_error(self, auth_client):
-        today = date.today()
-        start = (today + timedelta(days=5)).isoformat()
-        end = (today + timedelta(days=10)).isoformat()
-        resp = auth_client.get(f"/profile?range=custom&start={start}&end={end}")
-        text = page_text(resp)
-        assert resp.status_code == 200
-        assert "That date range is in the future." in text
-
-    def test_start_end_ignored_when_range_is_not_custom(self, auth_client):
-        """Edge case table: start/end given with a non-custom range are
-        ignored; the preset wins."""
-        user_id = _get_user_id("test@example.com")
-        today = date.today()
-        _set_budget(user_id, 100000)
-        _insert_expense(user_id, 400, "Food", today, "this month expense")
-
-        resp = auth_client.get("/profile?range=this_month&start=2000-01-01&end=2000-01-02")
-        text = page_text(resp)
-
-        assert resp.status_code == 200
-        assert _budget_subtext(400, 100000) in text
-        assert "Please enter valid dates." not in text
-
-    def test_extra_unknown_query_params_are_ignored(self, auth_client):
-        user_id = _get_user_id("test@example.com")
-        today = date.today()
-        _set_budget(user_id, 100000)
-        _insert_expense(user_id, 321, "Food", today, "expense")
-
-        resp = auth_client.get("/profile?foo=bar&range=this_month&baz=qux")
-        text = page_text(resp)
-
-        assert resp.status_code == 200
-        assert _budget_subtext(321, 100000) in text
-        assert "Unknown date range." not in text
-
-
-# ------------------------------------------------------------------ #
-# AC10-AC12 — history-start adjustment notes
-# ------------------------------------------------------------------ #
-
-class TestHistoryStartAdjustment:
-    def test_custom_start_before_history_start_moves_start_and_notes(self, auth_client):
-        """AC10: a custom range starting before history start shows the
-        "Showing data from ..." note and correct figures from history
-        start."""
-        user_id = _get_user_id("test@example.com")
-        today = date.today()
-        _set_budget(user_id, 100000)
-        oldest_expense_date = today - timedelta(days=30)
-        _insert_expense(user_id, 500, "Food", oldest_expense_date, "history start expense")
-        far_past_start = oldest_expense_date - timedelta(days=1000)
-
-        resp = auth_client.get(
-            f"/profile?range=custom&start={far_past_start.isoformat()}&end={today.isoformat()}"
-        )
-        text = page_text(resp)
-
-        assert resp.status_code == 200
-        padded, unpadded = _date_variants(oldest_expense_date)
-        note_padded = f"Showing data from {padded}, when your records begin."
-        note_unpadded = f"Showing data from {unpadded}, when your records begin."
-        assert note_padded in text or note_unpadded in text, "expected the case-(a) history-start note"
-        assert _money(500) in text
-
-    def test_custom_range_entirely_before_history_start_is_empty_with_note(self, auth_client):
-        """AC11: a custom range entirely before history start shows the
-        "Your records begin on ..." note and 0/empty states."""
-        user_id = _get_user_id("test@example.com")
-        today = date.today()
-        _set_budget(user_id, 100000)
-        oldest_expense_date = today - timedelta(days=10)
-        _insert_expense(user_id, 500, "Food", oldest_expense_date, "only expense")
-        range_end = oldest_expense_date - timedelta(days=5)
-        range_start = range_end - timedelta(days=30)
-
-        resp = auth_client.get(
-            f"/profile?range=custom&start={range_start.isoformat()}&end={range_end.isoformat()}"
-        )
-        text = page_text(resp)
-
-        assert resp.status_code == 200
-        padded, unpadded = _date_variants(oldest_expense_date)
-        note_padded = f"Your records begin on {padded} — there's no data before that."
-        note_unpadded = f"Your records begin on {unpadded} — there's no data before that."
-        assert note_padded in text or note_unpadded in text, "expected the case-(b) history-start note"
-        assert "No expenses in this period." in text
-
-    def test_custom_range_entirely_before_history_start_hides_budget_table(self, auth_client):
-        """FR6 case (b): "Empty result (₹0, 0 transactions, no top category,
-        empty list/bars, no budget table)" — with monthly_budget set and a
-        multi-month custom range entirely before history start, neither the
-        budget subtext nor the Month-by-month budget table appears."""
-        user_id = _get_user_id("test@example.com")
-        today = date.today()
-        _set_budget(user_id, 10000)
-        oldest_expense_date = today - timedelta(days=10)
-        _insert_expense(user_id, 500, "Food", oldest_expense_date, "only expense")
-
-        resp = auth_client.get("/profile?range=custom&start=2000-01-01&end=2000-12-31")
-        text = page_text(resp)
-
-        assert resp.status_code == 200
-        assert "budget used" not in text, "no budget subtext for an empty, pre-history-start range"
-        assert "Uses your current monthly budget for every month." not in text, (
-            "no Month-by-month budget table for an empty, pre-history-start range"
-        )
-
-    def test_custom_range_with_future_end_clamps_to_today(self, auth_client):
-        """AC12: end in the future + start in the past -> 200, no error,
-        "Showing ..." ends at today."""
-        today = date.today()
-        start = (today - timedelta(days=5)).isoformat()
-        end = (today + timedelta(days=30)).isoformat()
-
-        resp = auth_client.get(f"/profile?range=custom&start={start}&end={end}")
-        text = page_text(resp)
-
-        assert resp.status_code == 200
-        assert "That date range is in the future." not in text
-        assert_date_in_text(text, today, "Showing line should clamp its end to today")
-
-
-# ------------------------------------------------------------------ #
-# AC13, AC14 — budget comparison
-# ------------------------------------------------------------------ #
-
-class TestBudgetComparison:
-    def test_single_month_range_shows_subtext_not_table(self, auth_client):
-        """AC13 (part 1): a single-month range with monthly_budget set shows
-        the subtext and no budget table."""
-        user_id = _get_user_id("test@example.com")
-        today = date.today()
-        _set_budget(user_id, 10000)
-        last_month_first = _months_ago_first(today, 1)
-        _insert_expense(user_id, 2500, "Food", last_month_first, "last month expense")
-
-        resp = auth_client.get("/profile?range=last_month")
-        text = page_text(resp)
-
-        assert resp.status_code == 200
-        assert _budget_subtext(2500, 10000) in text
-        assert "Uses your current monthly budget for every month." not in text
-
-    def test_multi_month_range_shows_table_not_subtext(self, auth_client):
-        """AC13 (part 2): a multi-month range hides the subtext and shows
-        one Month-by-month row per month, oldest first, with correct Spent
-        and % used, and the fixed caption."""
-        user_id = _get_user_id("test@example.com")
-        today = date.today()
-        _set_budget(user_id, 10000)
-        m0 = _months_ago_first(today, 2)
-        m1 = _add_months(m0, 1)
-        # m2 (the current month) is left with 0 spend to also exercise
-        # FR7's "no-spend month shows ₹0.00 and 0%" rule.
-        _insert_expense(user_id, 1000, "Food", m0, "month0 expense")
-        _insert_expense(user_id, 2000, "Food", m1, "month1 expense")
-
-        resp = auth_client.get("/profile?range=last_3_months")
-        text = page_text(resp)
-
-        assert resp.status_code == 200
-        assert "budget used" not in text, "subtext must be hidden for a multi-month range"
-        assert "Uses your current monthly budget for every month." in text
-        assert m0.strftime("%b %Y") in text
-        assert m1.strftime("%b %Y") in text
-        assert today.strftime("%b %Y") in text
-        assert _money(1000) in text
-        assert _money(2000) in text
-        # 1000/10000 = 10%, 2000/10000 = 20%
-        assert "10%" in text
-        assert "20%" in text
-        # FR7: the current (0-spend) month shows ₹0.00 and 0% — "0%" alone
-        # would also match the tail of "10%"/"20%", so require it not be
-        # preceded by a digit.
-        assert f"{RUPEE}0.00" in text, "expected the 0-spend month's Spent cell to show ₹0.00"
-        assert re.search(r"(?<!\d)0%", text), "expected the 0-spend month's % used cell to show 0%"
-
-    @pytest.mark.parametrize("range_param", ["this_month", "last_month", "last_3_months", "all_time"])
-    def test_no_monthly_budget_shows_neither_subtext_nor_table(self, auth_client, range_param):
-        """AC14: with no monthly_budget, no subtext or table appears for
-        any range."""
-        user_id = _get_user_id("test@example.com")
-        today = date.today()
-        _set_budget(user_id, None)
-        _insert_expense(user_id, 500, "Food", today, "expense")
-
-        resp = auth_client.get(f"/profile?range={range_param}")
-        text = page_text(resp)
-
-        assert resp.status_code == 200
-        assert "budget used" not in text
-        assert "Uses your current monthly budget for every month." not in text
-
-    def test_zero_budget_shows_dash_for_percent_used(self, auth_client):
-        """Edge case: monthly_budget = 0 still shows the table (it's a set
-        value, unlike NULL), but % used shows an em dash, not a
-        division-by-zero result."""
-        user_id = _get_user_id("test@example.com")
-        today = date.today()
-        _set_budget(user_id, 0)
-        m0 = _months_ago_first(today, 2)
-        _insert_expense(user_id, 500, "Food", m0, "expense")
-
-        resp = auth_client.get("/profile?range=last_3_months")
-        text = page_text(resp)
-
-        assert resp.status_code == 200
-        assert "—" in text, "expected an em dash for % used when budget is 0"
-
-
-# ------------------------------------------------------------------ #
-# AC15 — empty states
-# ------------------------------------------------------------------ #
-
-class TestEmptyStates:
-    def test_empty_range_shows_no_expenses_message_in_both_sections(self, auth_client):
-        """AC15: empty ranges show "No expenses in this period." in both
-        Recent Transactions and By Category."""
-        user_id = _get_user_id("test@example.com")
-        today = date.today()
-        _set_budget(user_id, 100000)
-        _insert_expense(user_id, 500, "Food", today, "this month only")
-
-        resp = auth_client.get("/profile?range=last_month")
-        text = page_text(resp)
-
-        assert resp.status_code == 200
-        assert text.count("No expenses in this period.") >= 2
-
-
-# ------------------------------------------------------------------ #
-# AC18 — filter bar placement, and auth guard
-# ------------------------------------------------------------------ #
-
-class TestFilterPlacementAndAuth:
-    def test_filter_form_absent_from_other_pages(self, client):
-        """AC18: the filter form appears on /profile only."""
-        for path in ("/", "/login", "/register", "/terms", "/privacy"):
-            resp = client.get(path)
-            text = page_text(resp)
-            assert 'name="range"' not in text, f"{path} must not contain the date-range filter form"
-
-    def test_unauthenticated_profile_with_range_redirects_to_login(self, client):
-        """Edge case table: logged-out visit to /profile?range=... keeps the
-        existing auth guard (redirect to /login)."""
-        resp = client.get("/profile?range=last_month", follow_redirects=False)
-        assert resp.status_code == 302
-        assert "/login" in resp.headers.get("Location", "")
-
-
-# ------------------------------------------------------------------ #
-# AC19 — active-range pill (FR10, Revision 1)
-# ------------------------------------------------------------------ #
-
-class TestActiveRangePill:
-    """FR10/AC19: the pill is `<span class="range-pill">…</span>`, distinct
-    from the 4 preset buttons that carry the same words, so `pill_text()`
-    can read its exact text for every case."""
-
-    def test_pill_reads_this_month_by_default(self, auth_client):
-        resp = auth_client.get("/profile")
-        assert pill_text(resp) == "This month"
-
-    def test_pill_reads_last_3_months_for_that_preset(self, auth_client):
-        resp = auth_client.get("/profile?range=last_3_months")
-        assert pill_text(resp) == "Last 3 months"
-
-    def test_pill_reads_custom_range_for_a_valid_custom_range(self, auth_client):
-        today = date.today()
-        start = today - timedelta(days=2)
-        resp = auth_client.get(
-            f"/profile?range=custom&start={start.isoformat()}&end={today.isoformat()}"
-        )
-        assert pill_text(resp) == "Custom range"
-
-    def test_pill_reads_this_month_after_an_error_fallback(self, auth_client):
-        """AC19: "after the bogus URL, it reads This month"."""
-        resp = auth_client.get("/profile?range=bogus")
-        text = page_text(resp)
-        assert "Unknown date range." in text, "sanity check that the fallback path was actually hit"
-        assert pill_text(resp) == "This month"
-
-
-# ------------------------------------------------------------------ #
-# AC21-AC24, AC26 — budget card + POST /profile/budget (FR9/FR11,
-# Revision 1)
-# ------------------------------------------------------------------ #
-
-class TestBudgetCard:
-    def test_add_budget_saves_shows_toast_and_card_state(self, auth_client):
-        """AC21: with no budget, /profile shows "+ Add monthly budget".
-        POSTing monthly_budget=10,000 saves 10000, redirects to /profile,
-        shows "Budget saved.", and the card then shows ₹10,000.00 with
-        "✎ Edit"."""
-        user_id = _get_user_id("test@example.com")
-        _set_budget(user_id, None)
-
-        resp_before = auth_client.get("/profile")
-        assert "+ Add monthly budget" in page_text(resp_before)
-
-        resp = auth_client.post(
-            "/profile/budget",
-            data={"monthly_budget": "10,000", "range": "this_month", "start": "", "end": ""},
-            follow_redirects=False,
-        )
-        assert resp.status_code == 302, "APIs section: POST /profile/budget always returns 302"
-        location = resp.headers.get("Location", "")
-        assert "/profile" in location
-
-        follow = auth_client.get(location)
-        text = page_text(follow)
-        assert follow.status_code == 200
-        assert "Budget saved." in text
-        assert f"{RUPEE}{_money(10000)}" in text
-        assert "✎ Edit" in text, "expected the pencil '✎ Edit' control"
-        assert "+ Add monthly budget" not in text
-
-        conn = db.get_db()
-        row = conn.execute("SELECT monthly_budget FROM users WHERE id = ?", (user_id,)).fetchone()
-        conn.close()
-        assert float(row[0]) == 10000, "commas/spaces must be stripped before saving"
-
-    def test_empty_budget_removes_it_and_shows_toast(self, auth_client):
-        """AC22: POSTing monthly_budget= (empty) removes the budget, shows
-        "Budget removed.", and the card shows "+ Add monthly budget"
-        again."""
-        user_id = _get_user_id("test@example.com")
-        _set_budget(user_id, 5000)
-
-        resp = auth_client.post(
-            "/profile/budget",
-            data={"monthly_budget": "", "range": "this_month", "start": "", "end": ""},
-            follow_redirects=False,
-        )
-        assert resp.status_code == 302, "APIs section: POST /profile/budget always returns 302"
-        location = resp.headers.get("Location", "")
-
-        follow = auth_client.get(location)
-        text = page_text(follow)
-        assert "Budget removed." in text
-        assert "+ Add monthly budget" in text
-
-        conn = db.get_db()
-        row = conn.execute("SELECT monthly_budget FROM users WHERE id = ?", (user_id,)).fetchone()
-        conn.close()
-        assert row[0] is None
-
-    @pytest.mark.parametrize("bad_value", ["-5", "abc"])
-    def test_invalid_budget_input_is_rejected_and_leaves_budget_unchanged(self, auth_client, bad_value):
-        """AC23: POSTing monthly_budget=-5 or abc leaves the budget
-        unchanged and shows the non-negative-number error."""
-        user_id = _get_user_id("test@example.com")
-        _set_budget(user_id, 7000)
-
-        resp = auth_client.post(
-            "/profile/budget",
-            data={"monthly_budget": bad_value, "range": "this_month", "start": "", "end": ""},
-            follow_redirects=False,
-        )
-        assert resp.status_code == 302, "APIs section: POST /profile/budget always returns 302"
-        location = resp.headers.get("Location", "")
-
-        follow = auth_client.get(location)
-        text = page_text(follow)
-        assert "Monthly budget must be a non-negative number." in text
-
-        conn = db.get_db()
-        row = conn.execute("SELECT monthly_budget FROM users WHERE id = ?", (user_id,)).fetchone()
-        conn.close()
-        assert float(row[0]) == 7000, "the bad input must not overwrite the existing budget"
-
-    def test_budget_post_redirect_preserves_the_current_filter(self, auth_client):
-        """AC24 (part 1): POSTing with range=last_3_months redirects to
-        /profile?range=last_3_months, not This month."""
-        resp = auth_client.post(
-            "/profile/budget",
-            data={"monthly_budget": "1000", "range": "last_3_months", "start": "", "end": ""},
-            follow_redirects=False,
-        )
-        assert resp.status_code == 302, "APIs section: POST /profile/budget always returns 302"
-        location = resp.headers.get("Location", "")
-        assert "/profile" in location
-        assert "range=last_3_months" in location
-
-    def test_logged_out_budget_post_redirects_to_login(self, client):
-        """AC24 (part 2): a logged-out POST redirects to /login."""
+    def test_budget_post_requires_login(self, client):
         resp = client.post(
             "/profile/budget",
             data={"monthly_budget": "1000", "range": "this_month", "start": "", "end": ""},
-            follow_redirects=False,
+        )
+        assert resp.status_code == 302, "logged-out POST /profile/budget must redirect"
+        assert "/login" in resp.headers["Location"]
+
+
+# ------------------------------------------------------------------ #
+# Filter bar rendering (AC1, AC2, AC18, AC19)                         #
+# ------------------------------------------------------------------ #
+
+
+class TestFilterBarRendering:
+    def test_profile_default_range_returns_200_and_this_month_active(self, auth_client):
+        resp = auth_client.get("/profile")
+        html = html_of(resp)
+        assert resp.status_code == 200
+        idx = html.find('aria-pressed="true"')
+        assert idx != -1, "expected one active preset carrying aria-pressed=true"
+        window = html[max(0, idx - 150) : idx + 150]
+        assert "This month" in window, "the default active preset must be This month"
+
+    def test_profile_get_contains_filter_bar_controls(self, auth_client):
+        resp = auth_client.get("/profile")
+        html = html_of(resp)
+        assert resp.status_code == 200
+        # The HTML `method` attribute is case-insensitive (the spec's own
+        # prose example happens to write it lowercase, but real markup may
+        # legitimately emit method="GET"), so match case-insensitively —
+        # the functional requirement is two separate GET forms, not a
+        # specific casing of the attribute value.
+        get_forms = re.findall(r'<form[^>]+method="get"', html, re.I)
+        assert len(get_forms) >= 2, (
+            "spec 06 FR1: two separate GET forms so Enter in a date box "
+            "submits custom range, not the first preset button"
+        )
+        for value in ("this_month", "last_month", "last_3_months", "all_time"):
+            assert has_control_with_value(html, value), f"missing preset control range={value}"
+        assert 'type="date"' in html
+        assert 'name="start"' in html
+        assert 'name="end"' in html
+        assert has_control_with_value(html, "custom"), "missing hidden range=custom field"
+        assert "Apply" in html
+
+    @pytest.mark.parametrize("path", ["/", "/login", "/register", "/terms", "/privacy"])
+    def test_filter_controls_absent_from_other_pages(self, client, path):
+        resp = client.get(path)
+        html = html_of(resp)
+        assert 'name="range"' not in html, (
+            f"spec 06 AC18: the filter bar must appear only on /profile, "
+            f"not on {path}"
+        )
+
+    def test_range_pill_shows_active_range_name(self, auth_client):
+        html = html_of(auth_client.get("/profile"))
+        assert '<span class="range-pill">This month</span>' in html
+
+        html = html_of(auth_client.get("/profile?range=last_3_months"))
+        assert '<span class="range-pill">Last 3 months</span>' in html
+
+        d = date.today().isoformat()
+        html = html_of(auth_client.get(f"/profile?range=custom&start={d}&end={d}"))
+        assert '<span class="range-pill">Custom range</span>' in html
+
+        html = html_of(auth_client.get("/profile?range=bogus"))
+        assert '<span class="range-pill">This month</span>' in html, (
+            "AC19: an error fallback must show the This month pill"
+        )
+
+
+# ------------------------------------------------------------------ #
+# Preset and custom range filtering (AC3-AC8)                         #
+# ------------------------------------------------------------------ #
+
+
+class TestPresetRanges:
+    def test_last_month_range_includes_only_previous_calendar_month(self, auth_client):
+        user_id = get_user_id()
+        today = date.today()
+        prev_start = first_of_previous_month(today)
+        prev_end = last_of_previous_month(today)
+        add_expense(user_id, 100, "Food", prev_start.isoformat(), "PREV-START")
+        add_expense(user_id, 110, "Food", prev_end.isoformat(), "PREV-END")
+        add_expense(user_id, 120, "Food", today.isoformat(), "THIS-MONTH")
+        add_expense(user_id, 130, "Food", (prev_start - timedelta(days=1)).isoformat(), "BEFORE-PREV")
+
+        html = html_of(auth_client.get("/profile?range=last_month"))
+        assert "PREV-START" in html
+        assert "PREV-END" in html
+        assert "THIS-MONTH" not in html
+        assert "BEFORE-PREV" not in html
+        assert '<span class="range-pill">Last month</span>' in html
+
+    def test_last_3_months_range_includes_expenses_from_two_months_back(self, auth_client):
+        user_id = get_user_id()
+        today = date.today()
+        range_start = first_of_month_n_back(today, 2)
+        add_expense(user_id, 100, "Food", range_start.isoformat(), "IN-RANGE-START")
+        add_expense(user_id, 110, "Food", today.isoformat(), "IN-RANGE-TODAY")
+        add_expense(user_id, 120, "Food", (range_start - timedelta(days=1)).isoformat(), "BEFORE-RANGE")
+
+        html = html_of(auth_client.get("/profile?range=last_3_months"))
+        assert "IN-RANGE-START" in html
+        assert "IN-RANGE-TODAY" in html
+        assert "BEFORE-RANGE" not in html
+
+    def test_all_time_range_includes_expenses_before_signup(self, auth_client):
+        user_id = get_user_id()
+        add_expense(user_id, 100, "Food", "2000-01-01", "ANCIENT")
+        add_expense(user_id, 110, "Food", date.today().isoformat(), "TODAY-EXP")
+
+        html = html_of(auth_client.get("/profile?range=all_time"))
+        assert "ANCIENT" in html, "AC5: all_time must include expenses dated before signup"
+        assert "TODAY-EXP" in html
+        assert '<span class="range-pill">All time</span>' in html
+
+    def test_start_end_params_ignored_when_range_is_a_preset(self, auth_client):
+        user_id = get_user_id()
+        today = date.today()
+        prev_start = first_of_previous_month(today)
+        add_expense(user_id, 77, "Food", prev_start.isoformat(), "PREV-MONTH-ITEM")
+
+        html = html_of(
+            auth_client.get("/profile?range=last_month&start=2000-01-01&end=2000-01-02")
+        )
+        assert "PREV-MONTH-ITEM" in html, "the preset must win; start/end are ignored"
+        assert '<span class="range-pill">Last month</span>' in html
+
+    def test_extra_unknown_query_params_are_ignored(self, auth_client):
+        resp = auth_client.get("/profile?range=this_month&foo=bar&baz=1")
+        assert resp.status_code == 200
+
+
+class TestCustomRange:
+    def test_custom_range_is_inclusive_on_both_ends(self, auth_client):
+        user_id = get_user_id()
+        start = date.today() - timedelta(days=10)
+        end = date.today() - timedelta(days=5)
+        add_expense(user_id, 50, "Food", start.isoformat(), "IN-START")
+        add_expense(user_id, 60, "Food", end.isoformat(), "IN-END")
+        add_expense(user_id, 70, "Food", (start - timedelta(days=1)).isoformat(), "OUT-BEFORE")
+        add_expense(user_id, 80, "Food", (end + timedelta(days=1)).isoformat(), "OUT-AFTER")
+
+        html = html_of(auth_client.get(f"/profile?range=custom&start={start}&end={end}"))
+        assert "IN-START" in html
+        assert "IN-END" in html
+        assert "OUT-BEFORE" not in html
+        assert "OUT-AFTER" not in html
+
+    def test_custom_range_single_day_is_valid(self, auth_client):
+        user_id = get_user_id()
+        d = date.today() - timedelta(days=5)
+        add_expense(user_id, 33, "Food", d.isoformat(), "SINGLE-DAY")
+
+        html = html_of(auth_client.get(f"/profile?range=custom&start={d}&end={d}"))
+        assert "SINGLE-DAY" in html
+        assert '<span class="range-pill">Custom range</span>' in html
+
+    def test_recent_transactions_shows_at_most_5_newest_first(self, auth_client):
+        user_id = get_user_id()
+        base = date.today() - timedelta(days=20)
+        dates = [base + timedelta(days=i) for i in range(7)]
+        for i, d in enumerate(dates):
+            add_expense(user_id, 10 + i, "Food", d.isoformat(), f"TXN-{i}")
+
+        html = html_of(
+            auth_client.get(f"/profile?range=custom&start={dates[0]}&end={dates[-1]}")
+        )
+        present = [f"TXN-{i}" for i in range(7) if f"TXN-{i}" in html]
+        assert len(present) == 5, f"expected exactly 5 rows, found {present}"
+        for i in range(2, 7):
+            assert f"TXN-{i}" in html, "the 5 newest expenses must be shown"
+        for i in range(0, 2):
+            assert f"TXN-{i}" not in html, "older expenses beyond the 5-row cap must not show"
+        # newest first
+        positions = [html.index(f"TXN-{i}") for i in range(6, 1, -1)]
+        assert positions == sorted(positions), "Recent Transactions must list newest first"
+
+    def test_other_users_expenses_never_appear_in_filtered_figures(self, auth_client):
+        # POST /register logs the new user in, which would silently swap
+        # auth_client's own session to the second account. Register the
+        # second user through an independent test client (same throwaway
+        # DB, separate cookie jar) so auth_client stays logged in as
+        # test@example.com throughout.
+        other_client = flask_app.test_client()
+        other_client.post(
+            "/register",
+            data={"name": "Other", "email": "other@example.com", "password": "testpass1"},
+        )
+        other_id = get_user_id("other@example.com")
+        add_expense(other_id, 5000, "Food", date.today().isoformat(), "OTHER-USER-EXPENSE")
+        my_id = get_user_id("test@example.com")
+        add_expense(my_id, 25, "Food", date.today().isoformat(), "MY-EXPENSE")
+
+        html = html_of(auth_client.get("/profile?range=all_time"))
+        assert "MY-EXPENSE" in html
+        assert "OTHER-USER-EXPENSE" not in html, "AC8: another user's expenses must never appear"
+
+
+# ------------------------------------------------------------------ #
+# Validation errors (AC9, APIs error table)                           #
+# ------------------------------------------------------------------ #
+
+
+class TestValidationErrors:
+    @pytest.mark.parametrize(
+        "query,expected_message",
+        [
+            ("range=bogus", "Unknown date range."),
+            ("range=custom&start=2026-09-01", "Please choose both a start and an end date."),
+            ("range=custom&start=&end=", "Please choose both a start and an end date."),
+            ("range=custom&start=abc&end=2026-09-10", "Please enter valid dates."),
+            ("range=custom&start=2026-02-30&end=2026-03-01", "Please enter valid dates."),
+            (
+                "range=custom&start=2026-09-10&end=2026-09-01",
+                "Start date must be on or before end date.",
+            ),
+        ],
+    )
+    def test_filter_errors_return_200_show_message_and_fall_back_to_this_month(
+        self, auth_client, query, expected_message
+    ):
+        resp = auth_client.get(f"/profile?{query}")
+        html = html_of(resp)
+        assert resp.status_code == 200, "invalid filter input must never produce a 4xx"
+        assert expected_message in html
+        assert '<span class="range-pill">This month</span>' in html
+
+    def test_future_start_date_shows_error_and_falls_back(self, auth_client):
+        future = (date.today() + timedelta(days=5)).isoformat()
+        far_future = (date.today() + timedelta(days=10)).isoformat()
+        html = html_of(
+            auth_client.get(f"/profile?range=custom&start={future}&end={far_future}")
+        )
+        assert "That date range is in the future." in html
+        assert '<span class="range-pill">This month</span>' in html
+
+    def test_end_in_future_start_in_past_clamps_to_today_without_error(self, auth_client):
+        start = date.today() - timedelta(days=10)
+        end = date.today() + timedelta(days=50)
+        html = html_of(auth_client.get(f"/profile?range=custom&start={start}&end={end}"))
+        assert "in the future" not in html.lower()
+        assert fmt(date.today()) in html, "the Showing line must end at today"
+
+
+# ------------------------------------------------------------------ #
+# History-start adjustment (AC10-AC12)                                #
+# ------------------------------------------------------------------ #
+
+
+class TestHistoryStartAdjustment:
+    def test_custom_range_before_history_start_shows_note_and_uses_history_start(self, auth_client):
+        user_id = get_user_id()
+        history_start = date.today() - timedelta(days=30)
+        add_expense(user_id, 250, "Food", history_start.isoformat(), "OLDEST")
+        requested_start = history_start - timedelta(days=100)
+
+        html = html_of(
+            auth_client.get(f"/profile?range=custom&start={requested_start}&end={date.today()}")
+        )
+        expected_note = f"Showing data from {fmt(history_start)}, when your records begin."
+        assert expected_note in html
+        assert "OLDEST" in html
+
+    def test_custom_range_entirely_before_history_start_shows_note_and_empty_state(self, auth_client):
+        user_id = get_user_id()
+        history_start = date.today() - timedelta(days=30)
+        add_expense(user_id, 250, "Food", history_start.isoformat(), "OLDEST")
+        requested_start = history_start - timedelta(days=100)
+        requested_end = history_start - timedelta(days=50)
+
+        html = html_of(
+            auth_client.get(
+                f"/profile?range=custom&start={requested_start}&end={requested_end}"
+            )
+        )
+        expected_note = f"Your records begin on {fmt(history_start)} — there's no data before that."
+        assert expected_note in html
+        assert "OLDEST" not in html
+        assert money(0) in html, "AC11: empty result must show ₹0.00"
+        assert "No expenses between" in html
+        assert "Try a wider range." in html
+
+    def test_preset_range_entirely_before_history_start_shows_no_note(self, auth_client):
+        # A fresh user's history start is today (no expenses, no earlier
+        # signup date to fall back on), so Last month is entirely before it.
+        html = html_of(auth_client.get("/profile?range=last_month"))
+        assert "when your records begin" not in html, (
+            "Edge Cases table: preset ranges never show the case (a)/(b) note"
+        )
+        assert "there's no data before that" not in html
+
+    def test_showing_line_for_fresh_user_starts_at_signup_date(self, auth_client):
+        # A brand-new user's history start = signup date = today, so This
+        # month's displayed start silently moves to today (spec 06 FR6,
+        # presets branch of case a) with no note shown.
+        html = html_of(auth_client.get("/profile"))
+        today = date.today()
+        expected = f"Showing {fmt(today)} – {fmt(today)}"
+        assert expected in html
+        assert "when your records begin" not in html
+        assert "there's no data before that" not in html
+
+
+# ------------------------------------------------------------------ #
+# Empty states (spec 06b FR8, superseding spec 06 AC15)               #
+# ------------------------------------------------------------------ #
+
+
+class TestEmptyStates:
+    def test_never_logged_expense_shows_first_empty_state(self, auth_client):
+        html = html_of(auth_client.get("/profile"))
+        assert "You haven't logged any expenses yet." in html
+
+    def test_user_with_zero_expenses_never_crashes_across_ranges(self, auth_client):
+        for query in (
+            "range=this_month",
+            "range=all_time",
+            "range=custom&start=2020-01-01&end=2020-01-02",
+        ):
+            resp = auth_client.get(f"/profile?{query}")
+            assert resp.status_code == 200
+            assert "You haven't logged any expenses yet." in html_of(resp)
+
+    def test_empty_filtered_range_shows_no_expenses_between_message(self, auth_client):
+        user_id = get_user_id()
+        add_expense(
+            user_id, 40, "Food", (date.today() - timedelta(days=200)).isoformat(), "OLD-EXPENSE"
+        )
+        gap_start = date.today() - timedelta(days=100)
+        gap_end = date.today() - timedelta(days=90)
+
+        html = html_of(
+            auth_client.get(f"/profile?range=custom&start={gap_start}&end={gap_end}")
+        )
+        expected = f"No expenses between {fmt(gap_start)} and {fmt(gap_end)}. Try a wider range."
+        assert expected in html
+        assert "OLD-EXPENSE" not in html
+
+
+# ------------------------------------------------------------------ #
+# Budget subtext and month-by-month table (AC13, AC14)                #
+# ------------------------------------------------------------------ #
+
+
+class TestBudgetSubtextAndTable:
+    def test_single_month_range_shows_budget_subtext_not_table(self, auth_client):
+        user_id = get_user_id()
+        auth_client.post(
+            "/profile/budget",
+            data={"monthly_budget": "10000", "range": "this_month", "start": "", "end": ""},
+        )
+        add_expense(user_id, 500, "Food", date.today().isoformat(), "SPEND")
+
+        html = html_of(auth_client.get("/profile?range=this_month"))
+        assert f"{money(500)} of {money(10000)} budget used" in html
+        assert "Uses your current monthly budget for every month." not in html
+
+    def test_multi_month_range_hides_subtext_shows_budget_table(self, auth_client):
+        user_id = get_user_id()
+        auth_client.post(
+            "/profile/budget",
+            data={"monthly_budget": "10000", "range": "this_month", "start": "", "end": ""},
+        )
+        today = date.today()
+        month1_start = first_of_previous_month(today)
+        add_expense(user_id, 300, "Food", month1_start.isoformat(), "PREV-MONTH-SPEND")
+        add_expense(user_id, 400, "Food", today.isoformat(), "THIS-MONTH-SPEND")
+
+        html = html_of(
+            auth_client.get(f"/profile?range=custom&start={month1_start}&end={today}")
+        )
+        assert "budget used" not in html, "the single-month subtext must be hidden"
+        assert "Uses your current monthly budget for every month." in html
+        assert money(300) in html
+        assert money(400) in html
+        # Scope the ordering check to the budget table itself — month
+        # labels like "Sep 2026" also appear in unrelated page text (e.g.
+        # a "Member since Sep 2026" header), so comparing raw whole-page
+        # positions is unreliable. "budget-table" is the table's own CSS
+        # class, confirmed by spec 06b's own end-to-end verification script.
+        table_start = html.index("budget-table")
+        table_html = html[table_start:]
+        prev_label = month1_start.strftime("%b %Y")
+        this_label = today.strftime("%b %Y")
+        assert prev_label in table_html and this_label in table_html, (
+            "expected both month labels inside the budget table"
+        )
+        assert table_html.index(prev_label) < table_html.index(this_label), (
+            "rows must be oldest month first"
+        )
+
+    def test_no_budget_set_shows_no_subtext_or_table_for_any_range(self, auth_client):
+        user_id = get_user_id()
+        add_expense(user_id, 500, "Food", date.today().isoformat(), "SPEND")
+
+        for query in ("range=this_month", "range=last_3_months"):
+            html = html_of(auth_client.get(f"/profile?{query}"))
+            assert "budget used" not in html
+            assert "Uses your current monthly budget for every month." not in html
+
+    def test_zero_budget_shows_dash_percent_no_division_by_zero(self, auth_client):
+        user_id = get_user_id()
+        auth_client.post(
+            "/profile/budget",
+            data={"monthly_budget": "0", "range": "this_month", "start": "", "end": ""},
+        )
+        today = date.today()
+        prev_start = first_of_previous_month(today)
+        add_expense(user_id, 50, "Food", prev_start.isoformat(), "X")
+
+        html = html_of(
+            auth_client.get(f"/profile?range=custom&start={prev_start}&end={today}")
+        )
+        assert "Uses your current monthly budget for every month." in html
+        assert "—" in html, "Edge Cases: budget=0 must show a dash, not divide by zero"
+
+
+# ------------------------------------------------------------------ #
+# Budget bar control (spec 06 FR9 as superseded by 06b FR3)           #
+# ------------------------------------------------------------------ #
+
+
+class TestBudgetBarControl:
+    def test_no_budget_shows_add_monthly_budget_control(self, auth_client):
+        html = html_of(auth_client.get("/profile"))
+        assert "Add monthly budget" in html
+
+    def test_setting_budget_shows_amount_and_toast(self, auth_client):
+        resp = auth_client.post(
+            "/profile/budget",
+            data={"monthly_budget": "10,000", "range": "this_month", "start": "", "end": ""},
+            follow_redirects=True,
+        )
+        html = html_of(resp)
+        assert resp.status_code == 200
+        assert money(10000) in html
+        assert "Add monthly budget" not in html
+        assert "Budget saved." in html
+        assert get_monthly_budget() == 10000, "commas must be stripped before saving"
+
+    def test_removing_budget_shows_add_control_again(self, auth_client):
+        auth_client.post(
+            "/profile/budget",
+            data={"monthly_budget": "10000", "range": "this_month", "start": "", "end": ""},
+        )
+        resp = auth_client.post(
+            "/profile/budget",
+            data={"monthly_budget": "", "range": "this_month", "start": "", "end": ""},
+            follow_redirects=True,
+        )
+        html = html_of(resp)
+        assert resp.status_code == 200
+        assert "Budget removed." in html
+        assert "Add monthly budget" in html
+        assert get_monthly_budget() is None
+
+    @pytest.mark.parametrize("bad_value", ["-5", "abc"])
+    def test_invalid_budget_input_leaves_budget_unchanged_and_errors(self, auth_client, bad_value):
+        auth_client.post(
+            "/profile/budget",
+            data={"monthly_budget": "10000", "range": "this_month", "start": "", "end": ""},
+        )
+        resp = auth_client.post(
+            "/profile/budget",
+            data={"monthly_budget": bad_value, "range": "this_month", "start": "", "end": ""},
+            follow_redirects=True,
+        )
+        html = html_of(resp)
+        assert resp.status_code == 200
+        assert "Monthly budget must be a non-negative number." in html
+        assert get_monthly_budget() == 10000, "an invalid value must not overwrite the saved budget"
+
+    def test_budget_value_ignores_commas_and_spaces(self, auth_client):
+        auth_client.post(
+            "/profile/budget",
+            data={"monthly_budget": " 10 000 ", "range": "this_month", "start": "", "end": ""},
+        )
+        assert get_monthly_budget() == 10000
+
+    def test_budget_zero_is_a_valid_value(self, auth_client):
+        resp = auth_client.post(
+            "/profile/budget",
+            data={"monthly_budget": "0", "range": "this_month", "start": "", "end": ""},
+            follow_redirects=True,
+        )
+        assert resp.status_code == 200
+        assert "Budget saved." in html_of(resp)
+        assert get_monthly_budget() == 0
+
+    def test_budget_post_redirects_preserving_preset_range(self, auth_client):
+        resp = auth_client.post(
+            "/profile/budget",
+            data={"monthly_budget": "5000", "range": "last_3_months", "start": "", "end": ""},
         )
         assert resp.status_code == 302
-        assert "/login" in resp.headers.get("Location", "")
+        assert "range=last_3_months" in resp.headers["Location"]
 
-    def test_money_amounts_use_thousands_commas(self, auth_client):
-        """AC26: amounts use commas, e.g. ₹10,000.00, in the budget card."""
-        user_id = _get_user_id("test@example.com")
-        _set_budget(user_id, 10000)
-
-        resp = auth_client.get("/profile")
-        text = page_text(resp)
-
-        assert resp.status_code == 200
-        assert f"{RUPEE}{_money(10000)}" in text
-
-    def test_money_uses_indian_grouping_not_international_for_lakh_amounts(self, auth_client):
-        """AC26 / FR11: at a lakh or more, Indian grouping (last 3 digits,
-        then 2s) differs visibly from Python's international `{:,.2f}` —
-        below a lakh the two styles are identical, so this needs an amount
-        of a lakh or more to actually exercise the difference. Uses the
-        Manual Verification Guide's own AC26 example (1234567.5 ->
-        ₹12,34,567.50, not ₹1,234,567.50)."""
-        user_id = _get_user_id("test@example.com")
-        _set_budget(user_id, 1234567.5)
-
-        resp = auth_client.get("/profile")
-        text = page_text(resp)
-
-        assert resp.status_code == 200
-        assert f"{RUPEE}12,34,567.50" in text
-        assert _money(1234567.5) == "12,34,567.50"
-        assert f"{RUPEE}1,234,567.50" not in text, "must not use international grouping"
+    def test_budget_post_redirects_preserving_custom_start_end(self, auth_client):
+        start, end = "2026-01-01", "2026-01-31"
+        resp = auth_client.post(
+            "/profile/budget",
+            data={"monthly_budget": "5000", "range": "custom", "start": start, "end": end},
+        )
+        assert resp.status_code == 302
+        location = resp.headers["Location"]
+        assert "range=custom" in location
+        assert f"start={start}" in location
+        assert f"end={end}" in location
 
 
 # ------------------------------------------------------------------ #
-# AC25 — budget field removed from the edit-profile popup (FR8,
-# Revision 1)
+# Money format (AC26, FR11)                                           #
 # ------------------------------------------------------------------ #
 
-class TestEditProfilePopupHasNoBudgetField:
-    def test_monthly_budget_field_appears_exactly_once_on_the_page(self, auth_client):
-        """AC25 (partial): the only monthly_budget field on /profile is the
-        budget card's (FR9) — the edit-profile popup no longer has one.
-        Checked as a page-wide count rather than scoping into the popup's
-        markup specifically.
 
-        SPEC GAP: the spec never gives the edit-profile popup's POST route
-        or its field names (only "e.g. changing the name" informally), so
-        the rest of AC25 — "saving the popup ... keeps an existing budget
-        unchanged" — can't be exercised by actually submitting that form
-        here. That half of AC25 is left untested; see the Manual
-        Verification Guide's AC25 row instead."""
-        user_id = _get_user_id("test@example.com")
-        _set_budget(user_id, 4242)
-
-        resp = auth_client.get("/profile")
-        text = page_text(resp)
-
+class TestMoneyFormat:
+    @pytest.mark.parametrize(
+        "raw_value,expected",
+        [
+            ("10000", "₹10,000.00"),
+            ("100000", "₹1,00,000.00"),
+            ("1234567.5", "₹12,34,567.50"),
+        ],
+    )
+    def test_budget_amount_uses_indian_digit_grouping(self, auth_client, raw_value, expected):
+        resp = auth_client.post(
+            "/profile/budget",
+            data={"monthly_budget": raw_value, "range": "this_month", "start": "", "end": ""},
+            follow_redirects=True,
+        )
+        html = html_of(resp)
         assert resp.status_code == 200
-        assert text.count('name="monthly_budget"') == 1, (
-            "expected exactly one monthly_budget field (the budget card's), "
-            "none left in the edit-profile popup"
+        assert expected in html, "spec 06 FR11: Indian digit grouping, not Python's {:,.2f}"
+
+
+# ------------------------------------------------------------------ #
+# Edit-profile interaction (AC16 / AC25)                              #
+# ------------------------------------------------------------------ #
+
+
+class TestEditProfileInteraction:
+    def test_saving_edit_profile_form_does_not_change_existing_budget(self, auth_client):
+        """SPEC GAP: the edit-profile POST route's full field list (e.g. a
+        display-name field) belongs to spec 04, which this file does not
+        read. Only `email` (spec 06b DOM hooks) and `notes`
+        (spec 06b FR10: `<textarea name="notes" form="profile-form">`) are
+        confirmed field names. This test therefore only asserts the
+        budget-preservation invariant (spec 06 AC25), not a specific
+        success status code for the save itself."""
+        auth_client.post(
+            "/profile/budget",
+            data={"monthly_budget": "7000", "range": "this_month", "start": "", "end": ""},
+        )
+        resp = auth_client.post(
+            "/profile", data={"email": "test@example.com", "notes": "updated via test"}
+        )
+        assert resp.status_code in (200, 302), "editing the profile popup must not error"
+        assert get_monthly_budget() == 7000, (
+            "spec 06 FR8: saving the edit-profile popup keeps monthly_budget unchanged"
         )

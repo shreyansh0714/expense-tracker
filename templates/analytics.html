@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}Analytics — Spendly{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/analytics.css') }}">
+{% endblock %}
+
+{% block content %}
+
+<svg width="0" height="0" style="position:absolute">
+    <filter id="hand-drawn" x="-6%" y="-25%" width="112%" height="150%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.018" numOctaves="3" seed="7" result="noise"></feTurbulence>
+        <feDisplacementMap in="SourceGraphic" in2="noise" scale="7"></feDisplacementMap>
+    </filter>
+</svg>
+
+<section class="coming-soon">
+
+    <div class="hand-drawn tilt-c coming-soon-card">
+        <svg preserveAspectRatio="none">
+            <rect x="1.5%" y="2%" width="97%" height="96%" rx="10" fill="none" stroke="var(--ink)" stroke-width="1.6" filter="url(#hand-drawn)"></rect>
+        </svg>
+
+        <div class="coming-soon-body">
+            <span class="coming-soon-icon" aria-hidden="true">
+                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round">
+                    <circle cx="24" cy="24" r="15.5"></circle>
+                    <path d="M24 14.5V24l6.5 4.5"></path>
+                </svg>
+            </span>
+
+            <p><span class="coming-soon-badge">Coming soon</span></p>
+
+            <h1 class="coming-soon-title">Advanced Analytics</h1>
+
+            <p class="coming-soon-text">We're working on powerful insights and visualizations to help you understand your spending patterns better.</p>
+
+            <span class="coming-soon-dots" aria-hidden="true">
+                <i></i><i></i><i></i>
+            </span>
+
+            <p class="coming-soon-note">We're crafting something special</p>
+        </div>
+    </div>
+
+</section>
+
+{% endblock %}

@@ -223,6 +223,15 @@ def privacy():
     return render_template("privacy.html")
 
 
+@app.route("/analytics")
+def analytics():
+    if "user_id" not in session:
+        flash("Please sign in to view analytics.", "error")
+        return redirect(url_for("login"))
+
+    return render_template("analytics.html")
+
+
 # ------------------------------------------------------------------ #
 # Placeholder routes — students will implement these                  #
 # ------------------------------------------------------------------ #
@@ -268,6 +277,9 @@ def profile():
         "active_range": active_range,
         "range_start": range_start,
         "range_end": range_end,
+        "range_start_label": format_day(range_start),
+        "range_end_label": format_day(range_end),
+        "has_expenses": first_expense_date is not None,
         "range_note": range_note,
         "filter_error": filter_error,
         "show_budget_subtext": budget is not None and single_month,

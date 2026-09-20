@@ -6,6 +6,8 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/profile.css') }}">
 {% endblock %}
 
+{% import "_icons.html" as icons %}
+
 {% block content %}
 
 <svg width="0" height="0" style="position:absolute">
@@ -30,7 +32,7 @@
                     <p class="profile-member-since">Member since {{ member_since }}</p>
                 </div>
             </div>
-            <button type="button" id="open-edit-profile" class="profile-edit-btn">&#9998; Edit profile</button>
+            <button type="button" id="open-edit-profile" class="profile-edit-btn">{{ icons.edit() }} Edit profile</button>
         </div>
         <div class="notes-sticky">
             <div class="notes-sticky-tape"></div>
@@ -65,6 +67,7 @@
     </div>
 
     {% macro budget_form() %}
+    <p class="budget-tip">Your current budget is used for every month in a multi-month view.</p>
     <form method="POST" action="{{ url_for('save_budget') }}" class="budget-form">
         <input type="hidden" name="range" value="{{ active_range }}">
         {% if active_range == 'custom' %}
@@ -81,42 +84,31 @@
     </form>
     {% endmacro %}
 
-    <div class="filter-summary-row">
-        <div class="budget-card-wrap">
-            <div class="hand-drawn tilt-h">
-                <svg preserveAspectRatio="none">
-                    <rect x="1.5%" y="4%" width="97%" height="91%" rx="8" fill="none" stroke="var(--ink)" stroke-width="1.5" filter="url(#hand-drawn)"></rect>
-                </svg>
-                {% if budget_amount is none %}
-                <details class="budget-card">
-                    <summary class="budget-card-add">+ Add monthly budget</summary>
-                    {{ budget_form() }}
-                </details>
-                {% else %}
-                <div class="budget-card">
-                    <h2 class="profile-card-title budget-card-title">Monthly budget</h2>
-                    <p class="budget-card-amount">₹{{ budget_amount|inr }}</p>
-                    <details class="budget-card-edit">
-                        <summary class="budget-card-edit-btn">&#9998; Edit</summary>
-                        {{ budget_form() }}
-                    </details>
-                </div>
-                {% endif %}
-            </div>
-            <p class="budget-tip">Your current budget is used for every month in a multi-month view.</p>
-        </div>
-        <div class="filter-summary">
-            {% if filter_error %}
-            <div class="auth-error profile-error">{{ filter_error }}</div>
+    <div class="range-budget-bar">
+        <p class="range-summary">Showing {{ range_start_label }} – {{ range_end_label }}
+            <span class="range-pill">{{ range_label }}</span></p>
+        <div class="budget-control">
+            {% if budget_amount is none %}
+            <details class="budget-details">
+                <summary class="budget-control-btn">{{ icons.plus() }} Add monthly budget</summary>
+                <div class="budget-popover">{{ budget_form() }}</div>
+            </details>
+            {% else %}
+            <span class="budget-control-amount">₹{{ budget_amount|inr }}</span>
+            <details class="budget-details">
+                <summary class="budget-control-btn">{{ icons.edit() }} Edit</summary>
+                <div class="budget-popover">{{ budget_form() }}</div>
+            </details>
             {% endif %}
-            {% if range_note %}
-            <p class="range-note">{{ range_note }}</p>
-            {% endif %}
-            <p class="range-summary">Showing {{ range_start.day }} {{ range_start.strftime('%b %Y') }} – {{ range_end.day }} {{ range_end.strftime('%b %Y') }}
-                <span class="range-pill">{{ range_label }}</span></p>
         </div>
-
     </div>
+
+    {% if filter_error %}
+    <div class="auth-error profile-error">{{ filter_error }}</div>
+    {% endif %}
+    {% if range_note %}
+    <p class="range-note">{{ range_note }}</p>
+    {% endif %}
 
     <div class="profile-stats-row">
         <div class="hand-drawn tilt-b">
@@ -124,11 +116,14 @@
                 <rect x="1.5%" y="5%" width="97%" height="88%" rx="8" fill="none" stroke="var(--ink)" stroke-width="1.5" filter="url(#hand-drawn)"></rect>
             </svg>
             <div class="stat-tile">
-                <span class="stat-tile-label">Total Spent</span>
-                <span class="stat-tile-value">₹{{ monthly_total|inr }}</span>
-                {% if show_budget_subtext %}
-                <span class="stat-tile-subtext">₹{{ monthly_total|inr }} of ₹{{ budget_amount|inr }} budget used</span>
-                {% endif %}
+                <div class="stat-tile-text">
+                    <span class="stat-tile-label">Total Spent</span>
+                    <span class="stat-tile-value">₹{{ monthly_total|inr }}</span>
+                    {% if show_budget_subtext %}
+                    <span class="stat-tile-subtext">₹{{ monthly_total|inr }} of ₹{{ budget_amount|inr }} budget used</span>
+                    {% endif %}
+                </div>
+                <span class="stat-tile-icon">{{ icons.wallet() }}</span>
             </div>
         </div>
         <div class="hand-drawn tilt-c">
@@ -136,8 +131,11 @@
                 <rect x="1.5%" y="5%" width="97%" height="88%" rx="8" fill="none" stroke="var(--ink)" stroke-width="1.5" filter="url(#hand-drawn)"></rect>
             </svg>
             <div class="stat-tile">
-                <span class="stat-tile-label">Transactions</span>
-                <span class="stat-tile-value">{{ transaction_count }}</span>
+                <div class="stat-tile-text">
+                    <span class="stat-tile-label">Transactions</span>
+                    <span class="stat-tile-value">{{ transaction_count }}</span>
+                </div>
+                <span class="stat-tile-icon">{{ icons.list() }}</span>
             </div>
         </div>
         <div class="hand-drawn tilt-d">
@@ -145,10 +143,87 @@
                 <rect x="1.5%" y="5%" width="97%" height="88%" rx="8" fill="none" stroke="var(--ink)" stroke-width="1.5" filter="url(#hand-drawn)"></rect>
             </svg>
             <div class="stat-tile">
-                <span class="stat-tile-label">Top Category</span>
-                <span class="stat-tile-value">{{ top_category or "—" }}</span>
+                <div class="stat-tile-text">
+                    <span class="stat-tile-label">Top Category</span>
+                    <span class="stat-tile-value">{{ top_category or "—" }}</span>
+                </div>
+                <span class="stat-tile-icon">{{ icons.heart() }}</span>
             </div>
         </div>
+    </div>
+
+
+    <div class="profile-content-grid">
+
+        <div class="hand-drawn tilt-e">
+        <svg preserveAspectRatio="none">
+            <rect x="1%" y="2.5%" width="98%" height="95%" rx="10" fill="none" stroke="var(--ink)" stroke-width="1.6" filter="url(#hand-drawn)"></rect>
+        </svg>
+        <div class="auth-card">
+            <div class="card-header">
+                <h2 class="profile-card-title">Recent Transactions</h2>
+                <a href="{{ url_for('analytics') }}" class="card-header-link">View all</a>
+            </div>
+            {% if recent_expenses %}
+            <table class="transactions-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Description</th>
+                        <th>Category</th>
+                        <th>Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for expense in recent_expenses %}
+                    <tr>
+                        <td>{{ expense.date }}</td>
+                        <td>{{ expense.description or "—" }}</td>
+                        <td><span class="category-pill" data-category="{{ expense.category|lower }}">{{ expense.category }}</span></td>
+                        <td>₹{{ expense.amount|inr }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            {% if has_expenses %}
+            <p class="profile-empty-state">No expenses between {{ range_start_label }} and {{ range_end_label }}. Try a wider range.</p>
+            {% else %}
+            <p class="profile-empty-state">You haven't logged any expenses yet.</p>
+            {% endif %}
+            {% endif %}
+        </div>
+        </div>
+
+        <div class="hand-drawn tilt-f">
+        <svg preserveAspectRatio="none">
+            <rect x="1.2%" y="2.5%" width="97.5%" height="95%" rx="10" fill="none" stroke="var(--ink)" stroke-width="1.6" filter="url(#hand-drawn)"></rect>
+        </svg>
+        <div class="auth-card">
+            <h2 class="profile-card-title">By Category</h2>
+            {% if category_totals %}
+                {% for row in category_totals %}
+                <div class="category-bar-row">
+                    <div class="category-bar-label">
+                        <span>{{ row.category }}</span>
+                        <span>₹{{ row.total|inr }}</span>
+                    </div>
+                    <div class="category-bar">
+                        <div class="category-bar-fill" data-category="{{ row.category|lower }}"
+                             style="width: {{ (row.total / category_totals[0].total * 100) | round(1) }}%"></div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+            {% if has_expenses %}
+            <p class="profile-empty-state">No expenses between {{ range_start_label }} and {{ range_end_label }}. Try a wider range.</p>
+            {% else %}
+            <p class="profile-empty-state">You haven't logged any expenses yet.</p>
+            {% endif %}
+            {% endif %}
+        </div>
+        </div>
+
     </div>
 
     {% if monthly_budget_rows %}
@@ -182,68 +257,6 @@
         </div>
     </div>
     {% endif %}
-
-    <div class="profile-content-grid">
-
-        <div class="hand-drawn tilt-e">
-        <svg preserveAspectRatio="none">
-            <rect x="1%" y="2.5%" width="98%" height="95%" rx="10" fill="none" stroke="var(--ink)" stroke-width="1.6" filter="url(#hand-drawn)"></rect>
-        </svg>
-        <div class="auth-card">
-            <h2 class="profile-card-title">Recent Transactions</h2>
-            {% if recent_expenses %}
-            <table class="transactions-table">
-                <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Description</th>
-                        <th>Category</th>
-                        <th>Amount</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for expense in recent_expenses %}
-                    <tr>
-                        <td>{{ expense.date }}</td>
-                        <td>{{ expense.description or "—" }}</td>
-                        <td><span class="category-pill" data-category="{{ expense.category|lower }}">{{ expense.category }}</span></td>
-                        <td>₹{{ expense.amount|inr }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            {% else %}
-            <p class="profile-empty-state">No expenses in this period.</p>
-            {% endif %}
-        </div>
-        </div>
-
-        <div class="hand-drawn tilt-f">
-        <svg preserveAspectRatio="none">
-            <rect x="1.2%" y="2.5%" width="97.5%" height="95%" rx="10" fill="none" stroke="var(--ink)" stroke-width="1.6" filter="url(#hand-drawn)"></rect>
-        </svg>
-        <div class="auth-card">
-            <h2 class="profile-card-title">By Category</h2>
-            {% if category_totals %}
-                {% for row in category_totals %}
-                <div class="category-bar-row">
-                    <div class="category-bar-label">
-                        <span>{{ row.category }}</span>
-                        <span>₹{{ row.total|inr }}</span>
-                    </div>
-                    <div class="category-bar">
-                        <div class="category-bar-fill" data-category="{{ row.category|lower }}"
-                             style="width: {{ (row.total / category_totals[0].total * 100) | round(1) }}%"></div>
-                    </div>
-                </div>
-                {% endfor %}
-            {% else %}
-            <p class="profile-empty-state">No expenses in this period.</p>
-            {% endif %}
-        </div>
-        </div>
-
-    </div>
 
 </section>
 

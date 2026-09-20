@@ -1,5 +1,14 @@
 # Spec 06 — Date Filter on the Profile Dashboard
 
+> **Partly superseded by `06b-profile-dashboard-restructure.md` (2026-09-20).**
+> That spec restructures the profile dashboard and changes three things this
+> one pins down: the monthly budget becomes a control on a slim bar rather
+> than a card, its `+` and `✎` characters become inline SVG icons, and the
+> empty-state text splits into two messages. Every bullet, acceptance
+> criterion and verification row affected is marked inline below. Everything
+> not marked still stands — in particular FR10 (the range pill) and FR11
+> (Indian digit grouping).
+
 ## Problem Statement
 
 Everything the profile dashboard (`GET /profile`) shows about money is locked to the
@@ -105,18 +114,23 @@ only; the only text taken from them is the tip line in FR9.*
 9. **Budget card**, on `/profile` only, directly below the filter bar on the **right**.
    The "Showing …" line, pill, notes and filter errors sit on the left of the same row,
    and on narrow screens the two stack. It has three states:
-   - **① No budget:** a card with an **+ Add monthly budget** control. It uses the
+   - **① No budget:** **[Superseded by spec 06b.]** Now a bar control reading **Add monthly
+     budget** preceded by a plus icon. Originally: a card with an **+ Add monthly budget** control. It uses the
      page's existing hand-drawn border treatment, like the stat tiles and the other
      cards. The infographic's dashed green outline is an **annotation** marking where
      the card sits, not part of the card, so it is not copied (developer's call,
      2026-09-20: the dashed green version "feels very out of place").
-   - **② Entering:** opening ① (or ③'s **✎ Edit**) reveals a form with a `₹` prefix, a
+   - **② Entering:** **[Superseded by spec 06b.]** The form now opens as a popover over the
+     page rather than expanding the card. Originally: opening ① (or ③'s **✎ Edit**) reveals a form with a `₹` prefix, a
      text box named `monthly_budget`, and a **Save budget** button. It uses the
      browser's built-in `<details>`, so it needs no JavaScript.
-   - **③ Budget set:** same card treatment, the title **Monthly budget**, the amount in the FR11 format
+   - **③ Budget set:** **[Superseded by spec 06b.]** Now the amount on the bar followed by a
+     control reading **Edit** preceded by a pencil icon; no card, no title.
+     Originally: same card treatment, the title **Monthly budget**, the amount in the FR11 format
      (e.g. `₹10,000.00`), and an **✎ Edit** control. The box is pre-filled.
    - Under the card, always: the tip line `Your current budget is used for every month
-     in a multi-month view.`
+     in a multi-month view.` **[Superseded by spec 06b.]** The sentence is unchanged but now
+     renders **inside** the Add/Edit popover, above the form.
    - Saving: commas and spaces are ignored (`10,000` = `10000`).
      - An **empty** box removes the budget: back to state ①, and the budget subtext
        and table disappear. Toast: `Budget removed.`
@@ -191,7 +205,7 @@ only; the only text taken from them is the tip line in FR9.*
 |---|---|
 | `database/db.py` | Generalise `get_monthly_category_totals(user_id)` and `get_monthly_transaction_count(user_id)` to take `start, end` (inclusive ISO dates) instead of computing the current month internally. This also removes their duplicated month-range code. `get_recent_expenses(user_id, limit=5)` gains an optional `start, end` bound. Add `get_first_expense_date(user_id)` (returns `MIN(date)` or `None`) and a per-month spend helper (`GROUP BY substr(date, 1, 7)`) for the budget table. Exact names are for the plan to decide. `/profile` is the only caller of these helpers. |
 | `app.py` | `profile()` reads `request.args`, resolves the effective range (presets, validation, adjustment rules), and passes the new context to all three `render_template("profile.html", …)` calls (GET, validation-error POST, IntegrityError POST). The range-resolving logic is a plain helper function in `app.py`, with no DB access inside it. |
-| `templates/profile.html` | Adds the filter bar, filter-error area, "Showing …" line, range note, and the Month-by-month budget table. The empty-state texts change from month wording (`No expenses logged this month yet.`, `No expenses logged yet.`) to `No expenses in this period.` |
+| `templates/profile.html` | Adds the filter bar, filter-error area, "Showing …" line, range note, and the Month-by-month budget table. The empty-state texts change from month wording (`No expenses logged this month yet.`, `No expenses logged yet.`) to `No expenses in this period.` **[Superseded by spec 06b.]** Spec 06b FR8 splits this into two messages: `You haven't logged any expenses yet.` when the account has never logged one, and `No expenses between <start> and <end>. Try a wider range.` when a filter matched nothing. |
 | `static/css/profile.css` (new) | Styles for the filter bar, active preset, and budget table only, using existing `:root` tokens. Linked from `profile.html` via `{% block head %}`. Existing profile styles stay in `style.css` |
 | `.claude/PROGRESS.md` | The `GET/POST /profile` row notes Step 6 once it's built |
 | Revision 1: `database/db.py` | New `update_monthly_budget(user_id, monthly_budget)` (`None` clears it) |
@@ -271,14 +285,14 @@ Assume today = 2026-09-19 in the examples. Tests should compute dates relative t
 - [x] AC12: A custom range with `end` in the future and `start` in the past returns 200 with no error, and the "Showing …" line ends at today.
 - [x] AC13: With a `monthly_budget` set, a single-month range shows the `₹<spent> of ₹<budget> budget used` subtext and no budget table. A multi-month range hides that text and shows the Month-by-month budget table with one row per month, oldest first, correct Spent and % used, and the caption `Uses your current monthly budget for every month.`
 - [x] AC14: With no `monthly_budget`, no budget subtext or table appears for any range.
-- [x] AC15: Empty ranges show `No expenses in this period.` in both Recent Transactions and By Category.
+- [x] AC15: **[Superseded by spec 06b.]** Replaced by spec 06b AC16/AC17 (two distinct messages). Originally: Empty ranges show `No expenses in this period.` in both Recent Transactions and By Category.
 - [x] AC16: Submitting the edit-profile modal still works and redirects to `/profile` (This month).
 - [x] AC17: The date input's calendar dropdown opens in a real browser when clicked (manual only).
 - [x] AC18: The filter form (preset buttons, `start`/`end` date inputs) appears on `/profile` only. `base.html` is unchanged by this step, and the rendered HTML of `/`, `/login`, `/register`, `/terms` and `/privacy` contains no `name="range"` element.
 - [x] AC19: The `<span class="range-pill">` in the "Showing …" line holds the active range's name: `This month` by default, `Last 3 months` for `?range=last_3_months`, `Custom range` for a valid custom range, and `This month` after an error fallback.
 - [x] AC20: Clicking anywhere on a From/To box opens the browser's calendar (manual only).
-- [x] AC21: With no budget, `/profile` shows `+ Add monthly budget`. POSTing `monthly_budget=10,000` to `/profile/budget` saves `10000`, redirects to `/profile`, shows `Budget saved.`, and the card then shows `₹10,000.00` with `✎ Edit`.
-- [x] AC22: POSTing `monthly_budget=` (empty) to `/profile/budget` removes the budget, shows `Budget removed.`, and the card shows `+ Add monthly budget` again.
+- [x] AC21: **[Superseded by spec 06b.]** The `+` and `✎` are now inline SVG icons, so the literal text is `Add monthly budget` and `Edit`; the card is now a bar. The save behaviour, the `10000` value and the `Budget saved.` toast are unchanged. Originally: With no budget, `/profile` shows `+ Add monthly budget`. POSTing `monthly_budget=10,000` to `/profile/budget` saves `10000`, redirects to `/profile`, shows `Budget saved.`, and the card then shows `₹10,000.00` with `✎ Edit`.
+- [x] AC22: **[Superseded by spec 06b.]** Literal text is now `Add monthly budget` (the `+` is an icon). Removal behaviour and the `Budget removed.` toast are unchanged. Originally: POSTing `monthly_budget=` (empty) to `/profile/budget` removes the budget, shows `Budget removed.`, and the card shows `+ Add monthly budget` again.
 - [x] AC23: POSTing `monthly_budget=-5` or `abc` to `/profile/budget` leaves the budget unchanged and shows `Monthly budget must be a non-negative number.`
 - [x] AC24: POSTing to `/profile/budget` with `range=last_3_months` redirects to `/profile?range=last_3_months`. A logged-out POST redirects to `/login`.
 - [x] AC25: The ✎ Edit profile popup has no `monthly_budget` field, and saving the popup (e.g. changing the name) keeps an existing budget unchanged.
@@ -306,18 +320,18 @@ Assume today = 2026-09-19 in the examples. Tests should compute dates relative t
 | AC8 | Register a second account in a private window and look at its `/profile?range=all_time` | ₹0 and 0 transactions, none of the demo account's expenses |
 | AC9 | Paste each URL, one by one: `/profile?range=bogus` · `/profile?range=custom&start=2026-09-01` · `/profile?range=custom&start=abc&end=2026-09-10` · `/profile?range=custom&start=2026-09-10&end=2026-09-01` · `/profile?range=custom&start=2030-01-01&end=2030-01-31` | Each shows its message from the spec's error table, in that order: `Unknown date range.` · `Please choose both a start and an end date.` · `Please enter valid dates.` · `Start date must be on or before end date.` · `That date range is in the future.`. The page still loads and This month is active |
 | AC10 | Visit `/profile?range=custom&start=2000-01-01&end=2026-09-19` | Note `Showing data from <oldest expense or signup date>, when your records begin.` Figures equal All time |
-| AC11 | Visit `/profile?range=custom&start=2000-01-01&end=2000-12-31` | Note `Your records begin on <date> — there's no data before that.` ₹0, 0, `No expenses in this period.` |
+| AC11 | Visit `/profile?range=custom&start=2000-01-01&end=2000-12-31` | Note `Your records begin on <date> — there's no data before that.` ₹0, 0, `No expenses in this period.` _Superseded by 06b: read `No expenses in this period.` as `No expenses between <start> and <end>. Try a wider range.` (06b FR8)._ |
 | AC12 | Visit `/profile?range=custom&start=2026-09-01&end=2030-12-31` | No error. The "Showing …" line ends at today's date |
 | AC13 | Make sure the budget card (right, under the filter bar) shows `₹10,000.00` (use the card to set it if not). Click **Last month**, then **Last 3 months** | Last month: `₹<last month's total> of ₹10,000.00 budget used` under Total Spent, no table. Last 3 months: no subtext, a table with rows Jul 2026, Aug 2026, Sep 2026, and the caption. Each row's Spent matches the query for that month |
-| AC14 | In the budget card click **✎ Edit**, empty the box, **Save budget**. Click Last 3 months | No budget text, no table |
-| AC15 | Visit the AC11 URL | Both sections say `No expenses in this period.` |
+| AC14 | In the budget card click **✎ Edit**, empty the box, **Save budget**. Click Last 3 months | No budget text, no table _Superseded by 06b: read **✎ Edit** as the bar's **Edit** control (06b FR3)._ |
+| AC15 | Visit the AC11 URL | Both sections say `No expenses in this period.` _Superseded by 06b: read `No expenses in this period.` as `No expenses between <start> and <end>. Try a wider range.` (06b FR8)._ |
 | AC16 | While on `?range=last_month`, open Edit profile and change your name → Save | You land on `/profile` (no `?range=`), with the "Profile updated." message |
 | AC17 | Click the From box in Chrome | A calendar dropdown appears. Picking a day fills the box |
 | AC18 | Look at the nav bar at the top of `/profile`, then visit `/`, `/terms`, `/privacy`. Also run `git diff main -- templates/base.html` | The filter buttons appear only in the profile page body, above the tiles, and never in the nav bar or on the other pages. The `git diff` command prints nothing |
 | AC19 | Click **Last 3 months**, then paste `/profile?range=bogus` | A green pill reading `Last 3 months` in the "Showing …" line; after the bogus URL, it reads `This month` |
 | AC20 | Click the **middle** of the From box, on the `dd/mm/yyyy` text, not the icon | The calendar opens |
-| AC21 | Log in as an account with no budget. In the card on the right, click **+ Add monthly budget**, type `10,000`, click **Save budget** | Green toast `Budget saved.` The card shows `₹10,000.00` and **✎ Edit** |
-| AC22 | Click **✎ Edit**, empty the box, click **Save budget** | Toast `Budget removed.` The card shows **+ Add monthly budget** again, and the budget line under Total Spent is gone |
+| AC21 | Log in as an account with no budget. In the card on the right, click **+ Add monthly budget**, type `10,000`, click **Save budget** | Green toast `Budget saved.` The card shows `₹10,000.00` and **✎ Edit** _Superseded by 06b: read **+ Add monthly budget** as the bar's **Add monthly budget** control (06b FR3)._ |
+| AC22 | Click **✎ Edit**, empty the box, click **Save budget** | Toast `Budget removed.` The card shows **+ Add monthly budget** again, and the budget line under Total Spent is gone _Superseded by 06b: read **✎ Edit** as the bar's **Edit** control (06b FR3)._ |
 | AC23 | Open the card's form, type `-5`, save. Then try `abc` | Red toast `Monthly budget must be a non-negative number.` each time, and the budget is unchanged |
 | AC24 | Click **Last 3 months**, then save a budget from the card | You land back on `/profile?range=last_3_months`, not This month |
 | AC25 | Open **✎ Edit profile** | No "Monthly budget" field. Change your name and save: the budget card still shows the same amount |
