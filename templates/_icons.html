@@ -1,0 +1,55 @@
+{#
+    Feather-style line icons, inlined as SVG.
+
+    One macro per glyph rather than a single icon(name) dispatcher: a typo
+    in `icons.wallett()` raises a Jinja UndefinedError straight away, where
+    an {% if name == ... %} chain would silently render nothing.
+
+    Every glyph inherits its container's colour via stroke="currentColor",
+    so no icon needs its own CSS rule. All icons here are decorative and
+    sit beside real text, hence aria-hidden — never use one on its own as
+    the entire label of a control.
+#}
+
+{% macro _svg(size) -%}
+viewBox="0 0 24 24" width="{{ size }}" height="{{ size }}" fill="none"
+stroke="currentColor" stroke-width="2" stroke-linecap="round"
+stroke-linejoin="round" aria-hidden="true" focusable="false"
+{%- endmacro %}
+
+{% macro edit(size=16) -%}
+<svg class="icon" {{ _svg(size) }}>
+    <path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path>
+</svg>
+{%- endmacro %}
+
+{% macro plus(size=16) -%}
+<svg class="icon" {{ _svg(size) }}>
+    <line x1="12" y1="5" x2="12" y2="19"></line>
+    <line x1="5" y1="12" x2="19" y2="12"></line>
+</svg>
+{%- endmacro %}
+
+{% macro wallet(size=20) -%}
+<svg class="icon" {{ _svg(size) }}>
+    <rect x="1" y="4" width="22" height="16" rx="2"></rect>
+    <line x1="1" y1="10" x2="23" y2="10"></line>
+</svg>
+{%- endmacro %}
+
+{% macro list(size=20) -%}
+<svg class="icon" {{ _svg(size) }}>
+    <line x1="8" y1="6" x2="21" y2="6"></line>
+    <line x1="8" y1="12" x2="21" y2="12"></line>
+    <line x1="8" y1="18" x2="21" y2="18"></line>
+    <line x1="3" y1="6" x2="3.01" y2="6"></line>
+    <line x1="3" y1="12" x2="3.01" y2="12"></line>
+    <line x1="3" y1="18" x2="3.01" y2="18"></line>
+</svg>
+{%- endmacro %}
+
+{% macro heart(size=20) -%}
+<svg class="icon" {{ _svg(size) }}>
+    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78Z"></path>
+</svg>
+{%- endmacro %}

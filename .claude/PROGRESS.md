@@ -24,8 +24,8 @@ unfinished. Flip a row to Implemented in the same commit that builds it.
 | `GET /logout` | Implemented — Step 3, clears the session, redirects to `landing` |
 | `GET /terms` | Implemented — renders `terms.html` |
 | `GET /privacy` | Implemented — renders `privacy.html` |
-| `GET/POST /profile` | Implemented — Steps 4-6, dashboard + edit modal + date filter (`?range=…`) |
-| `POST /profile/budget` | Implemented — Step 6 Revision 1, saves/removes the monthly budget from the budget card, redirects back to `/profile` with the current filter |
+| `GET/POST /profile` | Implemented — Steps 4-6 + 6b, dashboard + edit modal + date filter (`?range=…`), restructured to the single-flow layout |
+| `POST /profile/budget` | Implemented — Step 6 Revision 1, saves/removes the monthly budget (from the range+budget bar since Step 6b), redirects back to `/profile` with the current filter |
 | `GET /analytics` | Implemented — Analytics "coming soon" page, login-required (redirects to `login`) |
 | `GET /expenses/add` | Stub — Step 7 |
 | `GET /expenses/<id>/edit` | Stub — Step 8 |
@@ -185,6 +185,37 @@ unfinished. Flip a row to Implemented in the same commit that builds it.
       date-time-filter , add the monthly budget button", merged to `main`
       on 2026-09-20 (`4d724ae`)
 
+### Step 6b — Profile Dashboard Restructure (2026-09-20)
+
+Driven by two infographics added to `static/images/`
+(`profile-dashboard-structure-infographic.png`,
+`profile-dashboard-before-after-infographic.png`). Spec
+`.claude/specs/06b-profile-dashboard-restructure.md`, plan
+`.claude/plans/06b-profile-dashboard-restructure.md`. Numbered `06b` rather
+than `07` because Steps 7-9 are already reserved for the expense CRUD stubs.
+
+- [x] Block order fixed: header → filter row → range+budget bar → 3 stat
+      tiles → content grid → month-by-month budget table **last** (it used to
+      split the page between the tiles and the grid)
+- [x] `.filter-summary-row` replaced by `.range-budget-bar` — range summary
+      left, budget control right. This is the order spec 06 FR9 asked for;
+      the previous build had the two sides reversed
+- [x] `templates/_icons.html` added: five Feather glyph macros (`edit`,
+      `plus`, `wallet`, `list`, `heart`) as inline SVG. Replaces the bare
+      `&#9998;` entities. No npm, no icon font, no CDN
+- [x] Stat tiles restructured to text column + circular icon badge
+- [x] "View all" link on Recent Transactions → `/analytics`
+- [x] Seven `--cat-*` tokens: one colour per expense category, with
+      `--cat-other` doubling as the fallback for free-text categories.
+      Contrast measured — pill text 4.89-10.35:1, bar fills 3.09-8.91:1.
+      `--cat-shopping` is `--accent-2` darkened to `#b8761f` because
+      `#c17f24` measured 2.79:1 as a bar fill, under the 3:1 threshold
+- [x] Empty states split in two: never-logged vs filter-matched-nothing
+- [x] `spec 06` marked in 13 places where `06b` supersedes it (FR9's budget
+      states, AC15/AC21/AC22, five verification rows)
+- [x] **Hand-drawn card borders fixed** — see the Open Tasks entry; they had
+      never rendered on any card but the page header
+
 ## Future Features
 
 Deferred because they need infrastructure this project doesn't have yet,
@@ -212,16 +243,17 @@ against the live code.
 | Profile page (`app.py:135`) | Monthly budget renders in scientific notation for values ≥ ₹1,000,000 (Python's `:g` format switches to exponent form, e.g. `1e+06`) — a real display bug. **Resolved 2026-09-20 (Step 6 Revision 1):** the popup's budget box that used `:g` was removed; the new budget card formats through the `inr` filter in `app.py`, which uses Indian digit grouping, e.g. `₹10,00,000.00` | Resolved |
 | Profile page (`static/css/style.css`) | `.profile-card-title` applies italic to *every* card title, but `design-system.md`'s table only specifies italic for the reference/notes card specifically — may be an intentional broader reading of the Typography section, needs a judgment call | Needs a decision |
 | `spendly-ui-polish` skill | The 3 saved eval prompts (`evals/evals.json`) have never actually been run — no results/workspace exist | Unverified |
-| Profile page (Step 5 dashboard/modal + Phase F visual polish) | Modal open/close, the crumple-open animation, `prefers-reduced-motion` behavior, the nested email-verification-modal-from-inside-the-edit-modal flow, the hand-drawn SVG card borders, the page-level crumple/fold-line background, and the Notes sticky note's `:focus-within` expand are only verified via code review + Flask test-client checks — never exercised in a real browser (Playwright's browser profile stayed locked across every session this work touched) | Unverified |
+| Profile page (Step 5 dashboard/modal + Phase F visual polish) | Modal open/close, the crumple-open animation, `prefers-reduced-motion` behavior, the nested email-verification-modal-from-inside-the-edit-modal flow, the hand-drawn SVG card borders, the page-level crumple/fold-line background, and the Notes sticky note's `:focus-within` expand were only verified via code review + Flask test-client checks — never exercised in a real browser (Playwright's browser profile stayed locked across every session this work touched). **Partly resolved 2026-09-20 (Step 6b):** Playwright ran, and the first real browser pass immediately found the hand-drawn SVG card borders rendered on *no* card except the page header — `.hand-drawn > svg` sat behind each card's opaque `--paper-card` background, so the stroke was painted over. Fixed with `z-index: 2` + `overflow: visible` on the svg. Also confirmed in-browser: `prefers-reduced-motion` disables the sticky transition, the edit-profile modal opens, and the page-level crumple/grain renders. Still unverified: the crumple-open animation itself and the nested email-verification-modal flow | Partly resolved |
 | `verify` subagent | Dropped on 2026-09-19: `/test-feature` covers the automatable acceptance criteria and the manual Validate step covers visual ones. The TODO was removed from `CLAUDE.md` and `create-spec.md`. Revisit when Playwright lands | Resolved — not needed |
 | `.claude/skill-briefs/spendly-ui-polish.md` | Stale scaffolding from before `skill-creator` ran — fully superseded by `.claude/skills/spendly-ui-polish/`, drifted out of sync with it. Safe-to-delete candidate | Cleanup |
 | `.claude/specs/01-databse-setup.md` | §14 "Definition of Done" checklist still all unchecked `- [ ]`, never flipped after the work was done | Doc-only |
 | `.claude/plans/01-database-setup.md` | Describes a verification script to run, but no pass/fail results were ever recorded | Doc-only |
 | Step 2 (Registration) | No `.claude/plans/02-registration.md` exists at all — the only Step missing a plan file, breaking `create-spec.md`'s own plan-pairing convention | Missing doc |
-| Profile date filter (`templates/profile.html`, the "Showing 1 Jul 2026 – 19 Sep 2026" line above the stat tiles) | The template builds that date text itself (`range_start.day` + `strftime('%b %Y')`), while `app.py` already has a helper, `format_day()`, that makes the exact same "19 Sep 2026" text for the range notes. Two copies of one format means a future format change has to be made in both. Fix: pass ready-made `range_start_label`/`range_end_label` from `app.py`. Deferred from the Step 6 code review (2026-09-19), `spendly-quality-reviewer` suggestion 1 | Cleanup |
+| Profile date filter (`templates/profile.html`, the "Showing 1 Jul 2026 – 19 Sep 2026" line above the stat tiles) | The template builds that date text itself (`range_start.day` + `strftime('%b %Y')`), while `app.py` already has a helper, `format_day()`, that makes the exact same "19 Sep 2026" text for the range notes. Two copies of one format means a future format change has to be made in both. Fix: pass ready-made `range_start_label`/`range_end_label` from `app.py`. Deferred from the Step 6 code review (2026-09-19), `spendly-quality-reviewer` suggestion 1. **Resolved 2026-09-20 (Step 6b, spec 06b FR9):** `profile()` now passes `range_start_label`/`range_end_label` built with `format_day()`, and `templates/profile.html` contains no `strftime` call | Resolved |
 | `app.py` — `format_day()` helper (Step 6) | Name is vague: it returns a full date ("19 Sep 2026"), not just a day. Rename to e.g. `format_short_date`. Optional, from the Step 6 code review | Cleanup |
 | `app.py` — `resolve_date_range()` (Step 6, turns `?range=…&start=…&end=…` into the dates the profile page shows) | Does 3 jobs in one ~58-line function: reads the preset, validates custom From/To dates, applies the "records begin" rules. Fine today; split into smaller helpers if another preset or rule is added. Optional, from the Step 6 code review | Cleanup |
 | `app.py` — `profile()` route's `dashboard` dict (Step 6) | One dict holds both the date-filter values and unrelated profile values (`member_since`, `original_email`). Naming nit only, no bug. Optional, from the Step 6 code review | Cleanup |
 | `/seed-expense` command (`.claude/commands/seed-expense.md`) | Creates expenses dated in the **future**. In `database.db` on 2026-09-19, user 6 has expenses up to 2026-09-23 and user 8 up to 2026-09-26. The Step 6 date filter never shows anything after today, so those seeded rows are invisible on `/profile`. Fix: cap seeded dates at today | Bug |
+| Profile page (`templates/profile.html`, the Recent Transactions and By Category cards) | The same 4-line empty-state `{% if has_expenses %}` / `{% else %}` block is pasted twice, once per card. Both render the identical two FR8 messages, so a wording change has to be made in two places. Fix: extract a `{% macro empty_state() %}` alongside the existing `budget_form()` macro and call it from both cards. Raised by `spendly-quality-reviewer` in the Step 6b review (2026-09-20) as non-blocking — deferred rather than fixed because a third copy doesn't exist yet | Cleanup |
 | CSRF protection (whole app) | No form in Spendly has CSRF protection yet. Not urgent for the Step 6 filter (GET forms that change nothing), but the edit-profile POST form would benefit. Raised as "FYI" by `spendly-security-reviewer` in the Step 6 review | Needs its own spec |
 | `.claude/specs/03-login-and-logout.md` | §8 Acceptance Criteria still all unchecked `- [ ]` in the spec itself, even though `.claude/plans/03-login-and-logout.md` documents completed manual verification with actual `curl` output — spec and plan are out of sync on completion status | Doc-only |

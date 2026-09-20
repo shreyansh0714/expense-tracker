@@ -39,7 +39,7 @@
     border-radius: 24px;
     background: var(--accent);
     color: var(--paper);
-    box-shadow: 0 10px 22px rgba(26, 71, 42, .22);
+    box-shadow: 0 10px 22px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
 .coming-soon-icon svg {

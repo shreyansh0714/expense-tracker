@@ -145,22 +145,20 @@
 
 .budget-table tr:last-child td { border-bottom: none; }
 
-/* --- Summary row: "Showing …" + pill on the left, budget card on the right --- */
+/* --- Range + budget bar: "Showing …" + pill left, budget control right --- */
 
-.filter-summary-row {
+.range-budget-bar {
     position: relative;
-    z-index: 1;
+    z-index: 2;
     display: flex;
-    align-items: flex-start;
-    gap: 1.5rem;
-}
-
-.filter-summary {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 0.6rem;
-    padding-top: 0.35rem;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.75rem 1.25rem;
+    background: var(--paper-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
 }
 
 .range-pill {
@@ -177,36 +175,29 @@
     vertical-align: middle;
 }
 
-/* --- Budget card: same paper/hand-drawn treatment as the other cards --- */
+/* --- Budget control: lives on the right of the bar --- */
 
-.budget-card-wrap {
-    width: 320px;
-    flex-shrink: 0;
+.budget-control {
     display: flex;
-    flex-direction: column;
-    gap: 0.6rem;
+    align-items: center;
+    gap: 0.75rem;
 }
 
-.tilt-h { transform: rotate(0.35deg); }
-
-.budget-card {
-    position: relative;
-    z-index: 1;
-    background: var(--paper-card);
-    border-radius: var(--radius-md);
-    padding: 1.1rem 1.25rem;
+.budget-control-amount {
+    font-family: var(--font-display);
+    font-size: 1.25rem;
+    color: var(--ink);
 }
 
-.budget-card summary {
-    list-style: none;
-    cursor: pointer;
-}
+.budget-details { position: relative; }
 
-.budget-card summary::-webkit-details-marker { display: none; }
+.budget-details summary { list-style: none; cursor: pointer; }
+.budget-details summary::-webkit-details-marker { display: none; }
 
-.budget-card-add,
-.budget-card-edit-btn {
-    display: inline-block;
+.budget-control-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
     padding: 0.4rem 0.9rem;
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
@@ -216,19 +207,20 @@
     color: var(--ink-soft);
 }
 
-.budget-card-add:hover,
-.budget-card-edit-btn:hover { background: var(--paper-warm); }
+.budget-control-btn:hover { background: var(--paper-warm); }
 
-.budget-card[open] .budget-card-add,
-.budget-card-edit[open] .budget-card-edit-btn { margin-bottom: 0.9rem; }
-
-.budget-card-title { font-size: 1rem; }
-
-.budget-card-amount {
-    font-family: var(--font-display);
-    font-size: 1.9rem;
-    color: var(--ink);
-    margin: 0.2rem 0 0.6rem;
+/* Absolute so opening the form never pushes the stat tiles down (AC7). */
+.budget-popover {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 0.5rem);
+    z-index: 20;
+    width: 280px;
+    padding: 1rem 1.1rem;
+    background: var(--paper-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    box-shadow: 0 12px 28px rgba(20, 15, 8, 0.14);
 }
 
 .budget-form {
@@ -256,6 +248,7 @@
 }
 
 .budget-input-group .form-input {
+    min-width: 0;
     border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
 }
 
@@ -273,20 +266,23 @@
 
 .budget-save-btn:hover { background: var(--ink); }
 
-.budget-card summary:focus-visible,
+.budget-details summary:focus-visible,
 .budget-save-btn:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
 }
 
 .budget-tip {
+    margin-bottom: 0.75rem;
     font-size: 0.78rem;
+    line-height: 1.5;
     color: var(--ink-muted);
-    padding: 0 0.25rem;
 }
 
 @media (max-width: 800px) {
     .date-filter-custom { padding-left: 0; border-left: none; }
-    .filter-summary-row { flex-direction: column; }
-    .budget-card-wrap { width: 100%; }
+    .range-budget-bar { flex-direction: column; align-items: flex-start; }
+    .budget-control { width: 100%; justify-content: space-between; }
+    .budget-details { position: static; }
+    .budget-popover { position: static; width: 100%; margin-top: 0.6rem; box-shadow: none; }
 }

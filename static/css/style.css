@@ -43,6 +43,20 @@
     --font-type: 'Special Elite', 'Courier New', monospace;
     --font-hand: 'Caveat', cursive;
 
+    /* Expense category colours (spec 06b FR7).
+       Ascending lightness, so bars stay separable when hue is lost.
+       --cat-food is exactly --accent. --cat-shopping is --accent-2
+       darkened just enough for its bar to clear 3:1 against the track
+       (#c17f24 measured 2.79:1). --cat-other doubles as the fallback
+       for any category string not listed: expenses.category is free text. */
+    --cat-food:          #1a472a;
+    --cat-entertainment: #7a3f6d;
+    --cat-bills:         #a34434;
+    --cat-transport:     #3d6b8e;
+    --cat-health:        #4a7d57;
+    --cat-other:         #8a8577;
+    --cat-shopping:      #b8761f;
+
     --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
     --crease:
         linear-gradient(114deg, rgba(255,255,255,.55) 0%, transparent 9%, transparent 21%, rgba(20,15,8,.07) 27%, transparent 35%, transparent 58%, rgba(255,255,255,.4) 65%, transparent 74%),
@@ -797,13 +811,53 @@ a { color: inherit; text-decoration: none; }
 .stat-tile {
     position: relative;
     z-index: 1;
+    height: 100%;
     background: var(--paper-card);
     border-radius: var(--radius-md);
     padding: 1.25rem 1.5rem;
     display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.stat-tile-text {
+    display: flex;
     flex-direction: column;
     gap: 0.35rem;
+    min-width: 0;
 }
+
+.stat-tile-icon {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: var(--accent-light);
+    color: var(--accent);
+}
+
+/* --- Card header: title left, optional link right --- */
+
+.card-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.card-header-link {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--accent);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.card-header-link:hover { color: var(--ink); }
 
 .stat-tile-label {
     font-size: 0.72rem;
@@ -888,26 +942,43 @@ textarea.form-input {
     font-weight: 600;
     padding: 0.2rem 0.65rem;
     border-radius: 999px;
-    background: var(--border-soft);
-    color: var(--ink-soft);
+    background: color-mix(in srgb, var(--cat-other) 14%, var(--paper-card));
+    color: color-mix(in srgb, var(--cat-other) 70%, var(--ink));
 }
 
-.category-pill[data-category="food"],
-.category-pill[data-category="health"] {
-    background: var(--accent-light);
-    color: var(--accent);
+.category-pill[data-category="food"] {
+    background: color-mix(in srgb, var(--cat-food) 14%, var(--paper-card));
+    color: color-mix(in srgb, var(--cat-food) 70%, var(--ink));
 }
 
-.category-pill[data-category="transport"],
-.category-pill[data-category="shopping"] {
-    background: var(--accent-2-light);
-    color: var(--accent-2);
-}
-
-.category-pill[data-category="bills"],
 .category-pill[data-category="entertainment"] {
-    background: var(--danger-light);
-    color: var(--danger);
+    background: color-mix(in srgb, var(--cat-entertainment) 14%, var(--paper-card));
+    color: color-mix(in srgb, var(--cat-entertainment) 70%, var(--ink));
+}
+
+.category-pill[data-category="bills"] {
+    background: color-mix(in srgb, var(--cat-bills) 14%, var(--paper-card));
+    color: color-mix(in srgb, var(--cat-bills) 70%, var(--ink));
+}
+
+.category-pill[data-category="transport"] {
+    background: color-mix(in srgb, var(--cat-transport) 14%, var(--paper-card));
+    color: color-mix(in srgb, var(--cat-transport) 70%, var(--ink));
+}
+
+.category-pill[data-category="health"] {
+    background: color-mix(in srgb, var(--cat-health) 14%, var(--paper-card));
+    color: color-mix(in srgb, var(--cat-health) 70%, var(--ink));
+}
+
+.category-pill[data-category="shopping"] {
+    background: color-mix(in srgb, var(--cat-shopping) 14%, var(--paper-card));
+    color: color-mix(in srgb, var(--cat-shopping) 70%, var(--ink));
+}
+
+.category-pill[data-category="other"] {
+    background: color-mix(in srgb, var(--cat-other) 14%, var(--paper-card));
+    color: color-mix(in srgb, var(--cat-other) 70%, var(--ink));
 }
 
 .category-bar-row { padding: 0.6rem 0; }
@@ -930,17 +1001,16 @@ textarea.form-input {
 .category-bar-fill {
     height: 100%;
     border-radius: 999px;
-    background: var(--ink-faint);
+    background: var(--cat-other);
 }
 
-.category-bar-fill[data-category="food"],
-.category-bar-fill[data-category="health"] { background: var(--accent); }
-
-.category-bar-fill[data-category="transport"],
-.category-bar-fill[data-category="shopping"] { background: var(--accent-2); }
-
-.category-bar-fill[data-category="bills"],
-.category-bar-fill[data-category="entertainment"] { background: var(--danger); }
+.category-bar-fill[data-category="food"] { background: var(--cat-food); }
+.category-bar-fill[data-category="entertainment"] { background: var(--cat-entertainment); }
+.category-bar-fill[data-category="bills"] { background: var(--cat-bills); }
+.category-bar-fill[data-category="transport"] { background: var(--cat-transport); }
+.category-bar-fill[data-category="health"] { background: var(--cat-health); }
+.category-bar-fill[data-category="shopping"] { background: var(--cat-shopping); }
+.category-bar-fill[data-category="other"] { background: var(--cat-other); }
 
 .profile-empty-state {
     font-size: 0.9rem;
@@ -1021,6 +1091,12 @@ textarea.form-input {
     inset: 0;
     width: 100%;
     height: 100%;
+    /* Above the card, not behind it: the card paints an opaque --paper-card
+       background, so a border drawn underneath was invisible on every card
+       except the page header. pointer-events stays off, so the stroke never
+       intercepts a click. */
+    z-index: 2;
+    overflow: visible;
     pointer-events: none;
 }
 
