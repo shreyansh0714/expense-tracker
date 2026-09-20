@@ -1,0 +1,1 @@
+This folder contains the nfographic of the spec, agents , plan and other docs , to visualise and plan the things accordingly , it help me to understand the feature in more visually way and built it according to my needs 

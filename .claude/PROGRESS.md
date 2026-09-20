@@ -24,7 +24,8 @@ unfinished. Flip a row to Implemented in the same commit that builds it.
 | `GET /logout` | Implemented — Step 3, clears the session, redirects to `landing` |
 | `GET /terms` | Implemented — renders `terms.html` |
 | `GET /privacy` | Implemented — renders `privacy.html` |
-| `GET/POST /profile` | Implemented — Steps 4-5, dashboard + edit modal |
+| `GET/POST /profile` | Implemented — Steps 4-6, dashboard + edit modal + date filter (`?range=…`) |
+| `POST /profile/budget` | Implemented — Step 6 Revision 1, saves/removes the monthly budget from the budget card, redirects back to `/profile` with the current filter |
 | `GET /expenses/add` | Stub — Step 7 |
 | `GET /expenses/<id>/edit` | Stub — Step 8 |
 | `GET /expenses/<id>/delete` | Stub — Step 9 |
@@ -149,6 +150,38 @@ unfinished. Flip a row to Implemented in the same commit that builds it.
       Phase E/F's visual work also lands, per the developer's explicit
       choice this session (not run incrementally after each phase).
 
+### Step 6 — Date Filter on the Profile Dashboard (2026-09-19)
+
+- [x] Spec `.claude/specs/06-date-time-filter.md` + plan
+      `.claude/plans/06-date-time-filter.md` written (branch
+      `feature/date-time-filter`)
+- [x] Filter bar on `/profile` only: This month / Last month / Last 3 months /
+      All time + native From/To date boxes; stat tiles, Recent Transactions,
+      By Category all follow the chosen range; error messages + "records
+      begin" notes for custom ranges; Month-by-month budget table for
+      multi-month ranges; styles in new `static/css/profile.css`
+- [x] `/test-feature`: 32/32 pass (`tests/test_06-date-time-filter.py`)
+- [x] `/code-review-feature`: first pass CHANGES REQUESTED (budget table
+      shown for a range entirely before the user's records, up to 23,989
+      rows) → fixed → re-review APPROVED (security: no findings; quality:
+      APPROVED). Deferred suggestions logged in **Open Tasks** below
+- [x] Revision 1 (2026-09-20), from the developer's manual check + the two
+      infographics in `static/images/`: monthly-budget card on `/profile`
+      (add / edit / remove, via the new `POST /profile/budget`), budget field
+      removed from the edit-profile popup, active-range pill, Indian money
+      grouping everywhere (`inr` Jinja filter, `₹12,34,567.50`), boxed
+      budget table with a light-green header, redesigned filter bar,
+      click-anywhere-to-open the date picker (`static/js/main.js`)
+- [x] Revision 1 checks: `/test-feature` 45/45 pass; `/code-review-feature`
+      → security had one Low finding (the `inr` filter crashed on `None` /
+      non-numeric input) which was fixed and confirmed closed, quality
+      APPROVED WITH SUGGESTIONS (suggestions applied: `POST /profile/budget`
+      added to the route table, stylesheet banner updated, stale money-format
+      notes corrected)
+- [x] Developer's Manual Verification Guide pass (Validate) — confirmed by
+      the developer on 2026-09-20
+- [ ] Commit, push, PR, merge
+
 ## Future Features
 
 Deferred because they need infrastructure this project doesn't have yet,
@@ -173,7 +206,7 @@ against the live code.
 
 | Area | Issue | Kind |
 |---|---|---|
-| Profile page (`app.py:135`) | Monthly budget renders in scientific notation for values ≥ ₹1,000,000 (Python's `:g` format switches to exponent form, e.g. `1e+06`) — a real display bug | Bug |
+| Profile page (`app.py:135`) | Monthly budget renders in scientific notation for values ≥ ₹1,000,000 (Python's `:g` format switches to exponent form, e.g. `1e+06`) — a real display bug. **Resolved 2026-09-20 (Step 6 Revision 1):** the popup's budget box that used `:g` was removed; the new budget card formats through the `inr` filter in `app.py`, which uses Indian digit grouping, e.g. `₹10,00,000.00` | Resolved |
 | Profile page (`static/css/style.css`) | `.profile-card-title` applies italic to *every* card title, but `design-system.md`'s table only specifies italic for the reference/notes card specifically — may be an intentional broader reading of the Typography section, needs a judgment call | Needs a decision |
 | `spendly-ui-polish` skill | The 3 saved eval prompts (`evals/evals.json`) have never actually been run — no results/workspace exist | Unverified |
 | Profile page (Step 5 dashboard/modal + Phase F visual polish) | Modal open/close, the crumple-open animation, `prefers-reduced-motion` behavior, the nested email-verification-modal-from-inside-the-edit-modal flow, the hand-drawn SVG card borders, the page-level crumple/fold-line background, and the Notes sticky note's `:focus-within` expand are only verified via code review + Flask test-client checks — never exercised in a real browser (Playwright's browser profile stayed locked across every session this work touched) | Unverified |
@@ -182,4 +215,10 @@ against the live code.
 | `.claude/specs/01-databse-setup.md` | §14 "Definition of Done" checklist still all unchecked `- [ ]`, never flipped after the work was done | Doc-only |
 | `.claude/plans/01-database-setup.md` | Describes a verification script to run, but no pass/fail results were ever recorded | Doc-only |
 | Step 2 (Registration) | No `.claude/plans/02-registration.md` exists at all — the only Step missing a plan file, breaking `create-spec.md`'s own plan-pairing convention | Missing doc |
+| Profile date filter (`templates/profile.html`, the "Showing 1 Jul 2026 – 19 Sep 2026" line above the stat tiles) | The template builds that date text itself (`range_start.day` + `strftime('%b %Y')`), while `app.py` already has a helper, `format_day()`, that makes the exact same "19 Sep 2026" text for the range notes. Two copies of one format means a future format change has to be made in both. Fix: pass ready-made `range_start_label`/`range_end_label` from `app.py`. Deferred from the Step 6 code review (2026-09-19), `spendly-quality-reviewer` suggestion 1 | Cleanup |
+| `app.py` — `format_day()` helper (Step 6) | Name is vague: it returns a full date ("19 Sep 2026"), not just a day. Rename to e.g. `format_short_date`. Optional, from the Step 6 code review | Cleanup |
+| `app.py` — `resolve_date_range()` (Step 6, turns `?range=…&start=…&end=…` into the dates the profile page shows) | Does 3 jobs in one ~58-line function: reads the preset, validates custom From/To dates, applies the "records begin" rules. Fine today; split into smaller helpers if another preset or rule is added. Optional, from the Step 6 code review | Cleanup |
+| `app.py` — `profile()` route's `dashboard` dict (Step 6) | One dict holds both the date-filter values and unrelated profile values (`member_since`, `original_email`). Naming nit only, no bug. Optional, from the Step 6 code review | Cleanup |
+| `/seed-expense` command (`.claude/commands/seed-expense.md`) | Creates expenses dated in the **future**. In `database.db` on 2026-09-19, user 6 has expenses up to 2026-09-23 and user 8 up to 2026-09-26. The Step 6 date filter never shows anything after today, so those seeded rows are invisible on `/profile`. Fix: cap seeded dates at today | Bug |
+| CSRF protection (whole app) | No form in Spendly has CSRF protection yet. Not urgent for the Step 6 filter (GET forms that change nothing), but the edit-profile POST form would benefit. Raised as "FYI" by `spendly-security-reviewer` in the Step 6 review | Needs its own spec |
 | `.claude/specs/03-login-and-logout.md` | §8 Acceptance Criteria still all unchecked `- [ ]` in the spec itself, even though `.claude/plans/03-login-and-logout.md` documents completed manual verification with actual `curl` output — spec and plan are out of sync on completion status | Doc-only |

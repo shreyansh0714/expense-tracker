@@ -1,20 +1,24 @@
+import math
 import os
 import sqlite3
-from datetime import datetime
+from datetime import date, datetime, timedelta
 
 from flask import Flask, flash, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash
 
 from database.db import (
     create_user,
+    get_category_totals,
     get_db,
-    get_monthly_category_totals,
-    get_monthly_transaction_count,
+    get_first_expense_date,
+    get_monthly_spend,
     get_recent_expenses,
+    get_transaction_count,
     get_user_by_email,
     get_user_by_id,
     init_db,
     seed_db,
+    update_monthly_budget,
     update_user,
 )
 
@@ -24,6 +28,116 @@ app.secret_key = os.environ.get("SECRET_KEY") or os.urandom(24)
 with app.app_context():
     init_db()
     seed_db()
+
+
+# ------------------------------------------------------------------ #
+# Helpers                                                             #
+# ------------------------------------------------------------------ #
+
+@app.template_filter("inr")
+def format_inr(amount):
+    """Indian digit grouping: 1234567.5 -> '12,34,567.50' (last 3 digits, then 2s)."""
+    try:
+        amount = float(amount)
+    except (TypeError, ValueError):
+        amount = 0.0
+    whole, _, paise = f"{amount:.2f}".partition(".")
+    sign, whole = ("-", whole[1:]) if whole.startswith("-") else ("", whole)
+    head, tail = whole[:-3], whole[-3:]
+    if head:
+        groups = [head[max(i - 2, 0):i] for i in range(len(head), 0, -2)]
+        tail = ",".join(reversed(groups)) + "," + tail
+    return f"{sign}{tail}.{paise}"
+
+
+def format_day(d):
+    return f"{d.day} {d.strftime('%b %Y')}"
+
+
+DATE_RANGES = {
+    "this_month": "This month",
+    "last_month": "Last month",
+    "last_3_months": "Last 3 months",
+    "all_time": "All time",
+    "custom": "Custom range",
+}
+
+
+def resolve_date_range(args, history_start, today):
+    """Turn the profile page's query string into an effective date range.
+
+    Returns (active_range, start, end, note, error). Both dates are inclusive.
+    """
+    active_range = args.get("range") or "this_month"
+    error = None
+    note = None
+
+    if active_range not in DATE_RANGES:
+        error = "Unknown date range."
+        active_range = "this_month"
+
+    if active_range == "custom":
+        start_raw = args.get("start", "").strip()
+        end_raw = args.get("end", "").strip()
+        try:
+            custom_start = date.fromisoformat(start_raw)
+            custom_end = date.fromisoformat(end_raw)
+        except ValueError:
+            custom_start = custom_end = None
+
+        if not start_raw or not end_raw:
+            error = "Please choose both a start and an end date."
+        elif custom_start is None:
+            error = "Please enter valid dates."
+        elif custom_start > custom_end:
+            error = "Start date must be on or before end date."
+        elif custom_start > today:
+            error = "That date range is in the future."
+
+        if error:
+            active_range = "this_month"
+
+    month_start = today.replace(day=1)
+    if active_range == "last_month":
+        end = month_start - timedelta(days=1)
+        start = end.replace(day=1)
+    elif active_range == "last_3_months":
+        months = today.year * 12 + today.month - 1 - 2
+        start = date(months // 12, months % 12 + 1, 1)
+        end = today
+    elif active_range == "all_time":
+        start, end = history_start, today
+    elif active_range == "custom":
+        start, end = custom_start, min(custom_end, today)
+    else:
+        start, end = month_start, today
+
+    if end < history_start:
+        if active_range == "custom":
+            note = f"Your records begin on {format_day(history_start)} — there's no data before that."
+    elif start < history_start:
+        start = history_start
+        if active_range == "custom":
+            note = f"Showing data from {format_day(history_start)}, when your records begin."
+
+    return active_range, start, end, note, error
+
+
+def build_budget_rows(budget, start, end, monthly_spend):
+    """One row per calendar month touched by start..end, oldest first."""
+    spent_by_month = {row["month"]: row["total"] for row in monthly_spend}
+    rows = []
+    month = start.replace(day=1)
+    while month <= end:
+        spent = spent_by_month.get(month.strftime("%Y-%m"), 0)
+        rows.append({
+            "month_label": month.strftime("%b %Y"),
+            "budget": budget,
+            "spent": spent,
+            "percent": round(spent / budget * 100) if budget else None,
+        })
+        month = (month + timedelta(days=32)).replace(day=1)
+    return rows
 
 
 # ------------------------------------------------------------------ #
@@ -120,52 +234,63 @@ def profile():
         return redirect(url_for("login"))
 
     user = get_user_by_id(session["user_id"])
-    category_totals = get_monthly_category_totals(user["id"])
-    monthly_total = sum(row["total"] for row in category_totals)
-    transaction_count = get_monthly_transaction_count(user["id"])
-    top_category = category_totals[0]["category"] if category_totals else None
-    recent_expenses = get_recent_expenses(user["id"], 5)
-    member_since = datetime.strptime(
-        user["created_at"], "%Y-%m-%d %H:%M:%S"
-    ).strftime("%b %Y")
+    created_at = datetime.strptime(user["created_at"], "%Y-%m-%d %H:%M:%S")
+    history_start = created_at.date()
+    first_expense_date = get_first_expense_date(user["id"])
+    if first_expense_date:
+        history_start = min(history_start, date.fromisoformat(first_expense_date))
+
+    active_range, range_start, range_end, range_note, filter_error = resolve_date_range(
+        request.args, history_start, date.today()
+    )
+    category_totals = get_category_totals(user["id"], range_start, range_end)
+    budget = user["monthly_budget"]
+    single_month = (range_start.year, range_start.month) == (range_end.year, range_end.month)
+    monthly_budget_rows = []
+    # Case (b): a range entirely before history start has no data, so no table
+    # (also stops a range like 0001-2000 from building thousands of empty rows).
+    if budget is not None and not single_month and range_end >= history_start:
+        monthly_budget_rows = build_budget_rows(
+            budget, range_start, range_end,
+            get_monthly_spend(user["id"], range_start, range_end),
+        )
+    dashboard = {
+        "member_since": created_at.strftime("%b %Y"),
+        "category_totals": category_totals,
+        "monthly_total": sum(row["total"] for row in category_totals),
+        "transaction_count": get_transaction_count(user["id"], range_start, range_end),
+        "top_category": category_totals[0]["category"] if category_totals else None,
+        "recent_expenses": get_recent_expenses(user["id"], range_start, range_end),
+        "original_email": user["email"],
+        "budget_amount": user["monthly_budget"],
+        "budget_input": "" if budget is None else format_inr(budget).removesuffix(".00"),
+        "range_label": DATE_RANGES[active_range],
+        "active_range": active_range,
+        "range_start": range_start,
+        "range_end": range_end,
+        "range_note": range_note,
+        "filter_error": filter_error,
+        "show_budget_subtext": budget is not None and single_month,
+        "monthly_budget_rows": monthly_budget_rows,
+        "today": date.today(),
+    }
 
     if request.method == "GET":
         return render_template(
             "profile.html",
             name=user["name"],
             email=user["email"],
-            monthly_budget=(
-                "" if user["monthly_budget"] is None else f"{user['monthly_budget']:g}"
-            ),
             notes=user["notes"] or "",
-            member_since=member_since,
-            category_totals=category_totals,
-            monthly_total=monthly_total,
-            transaction_count=transaction_count,
-            top_category=top_category,
-            recent_expenses=recent_expenses,
-            original_email=user["email"],
-            budget_amount=user["monthly_budget"],
+            **dashboard,
         )
 
     name = request.form.get("name", "").strip()
     email = request.form.get("email", "").strip()
-    monthly_budget_raw = request.form.get("monthly_budget", "").strip()
     notes = request.form.get("notes", "").strip()
     current_password = request.form.get("current_password", "")
     new_password = request.form.get("new_password", "")
     confirm_password = request.form.get("confirm_password", "")
     verification_code = request.form.get("verification_code", "")
-
-    monthly_budget = None
-    budget_error = False
-    if monthly_budget_raw:
-        try:
-            monthly_budget = float(monthly_budget_raw)
-            if monthly_budget < 0:
-                budget_error = True
-        except ValueError:
-            budget_error = True
 
     changing_password = bool(current_password or new_password or confirm_password)
     email_changed = email != user["email"]
@@ -175,8 +300,6 @@ def profile():
         error = "Name is required."
     elif "@" not in email:
         error = "Please enter a valid email address."
-    elif budget_error:
-        error = "Monthly budget must be a non-negative number."
     elif len(notes) > 2000:
         error = "Notes must be 2000 characters or fewer."
     elif changing_password and not (current_password and new_password and confirm_password):
@@ -202,16 +325,8 @@ def profile():
             error=error,
             name=name,
             email=email,
-            monthly_budget=monthly_budget_raw,
             notes=notes,
-            member_since=member_since,
-            category_totals=category_totals,
-            monthly_total=monthly_total,
-            transaction_count=transaction_count,
-            top_category=top_category,
-            recent_expenses=recent_expenses,
-            original_email=user["email"],
-            budget_amount=user["monthly_budget"],
+            **dashboard,
         )
 
     try:
@@ -219,7 +334,7 @@ def profile():
             user["id"],
             name,
             email,
-            monthly_budget,
+            user["monthly_budget"],
             notes or None,
             password=new_password if changing_password else None,
         )
@@ -229,20 +344,43 @@ def profile():
             error="An account with this email already exists.",
             name=name,
             email=email,
-            monthly_budget=monthly_budget_raw,
             notes=notes,
-            member_since=member_since,
-            category_totals=category_totals,
-            monthly_total=monthly_total,
-            transaction_count=transaction_count,
-            top_category=top_category,
-            recent_expenses=recent_expenses,
-            original_email=user["email"],
-            budget_amount=user["monthly_budget"],
+            **dashboard,
         )
 
     flash("Profile updated.", "success")
     return redirect(url_for("profile"))
+
+
+@app.route("/profile/budget", methods=["POST"])
+def save_budget():
+    if "user_id" not in session:
+        flash("Please sign in to view your profile.", "error")
+        return redirect(url_for("login"))
+
+    filter_args = {
+        key: request.form[key]
+        for key in ("range", "start", "end")
+        if request.form.get(key)
+    }
+    raw = request.form.get("monthly_budget", "").replace(",", "").replace(" ", "")
+
+    if not raw:
+        update_monthly_budget(session["user_id"], None)
+        flash("Budget removed.", "success")
+    else:
+        try:
+            monthly_budget = float(raw)
+            valid = math.isfinite(monthly_budget) and monthly_budget >= 0
+        except ValueError:
+            valid = False
+        if not valid:
+            flash("Monthly budget must be a non-negative number.", "error")
+        else:
+            update_monthly_budget(session["user_id"], monthly_budget)
+            flash("Budget saved.", "success")
+
+    return redirect(url_for("profile", **filter_args))
 
 
 @app.route("/expenses/add")

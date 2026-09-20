@@ -1,5 +1,5 @@
 import sqlite3
-from datetime import date, timedelta
+from datetime import date
 from werkzeug.security import generate_password_hash
 
 DB_PATH = "database.db"
@@ -138,44 +138,74 @@ def update_user(user_id, name, email, monthly_budget, notes, password=None):
         conn.close()
 
 
-def get_monthly_category_totals(user_id):
+def update_monthly_budget(user_id, monthly_budget):
     conn = get_db()
     try:
-        today = date.today()
-        month_start = today.replace(day=1)
-        month_end = (month_start + timedelta(days=32)).replace(day=1)
+        conn.execute(
+            "UPDATE users SET monthly_budget = ? WHERE id = ?",
+            (monthly_budget, user_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_category_totals(user_id, start, end):
+    conn = get_db()
+    try:
         return conn.execute(
             "SELECT category, SUM(amount) as total FROM expenses "
-            "WHERE user_id = ? AND date >= ? AND date < ? "
+            "WHERE user_id = ? AND date >= ? AND date <= ? "
             "GROUP BY category ORDER BY total DESC",
-            (user_id, month_start.isoformat(), month_end.isoformat()),
+            (user_id, start.isoformat(), end.isoformat()),
         ).fetchall()
     finally:
         conn.close()
 
 
-def get_monthly_transaction_count(user_id):
+def get_transaction_count(user_id, start, end):
     conn = get_db()
     try:
-        today = date.today()
-        month_start = today.replace(day=1)
-        month_end = (month_start + timedelta(days=32)).replace(day=1)
         return conn.execute(
             "SELECT COUNT(*) FROM expenses "
-            "WHERE user_id = ? AND date >= ? AND date < ?",
-            (user_id, month_start.isoformat(), month_end.isoformat()),
+            "WHERE user_id = ? AND date >= ? AND date <= ?",
+            (user_id, start.isoformat(), end.isoformat()),
         ).fetchone()[0]
     finally:
         conn.close()
 
 
-def get_recent_expenses(user_id, limit=5):
+def get_recent_expenses(user_id, start, end, limit=5):
     conn = get_db()
     try:
         return conn.execute(
-            "SELECT * FROM expenses WHERE user_id = ? "
+            "SELECT * FROM expenses WHERE user_id = ? AND date >= ? AND date <= ? "
             "ORDER BY date DESC, id DESC LIMIT ?",
-            (user_id, limit),
+            (user_id, start.isoformat(), end.isoformat(), limit),
+        ).fetchall()
+    finally:
+        conn.close()
+
+
+def get_first_expense_date(user_id):
+    conn = get_db()
+    try:
+        return conn.execute(
+            "SELECT MIN(date) FROM expenses WHERE user_id = ?",
+            (user_id,),
+        ).fetchone()[0]
+    finally:
+        conn.close()
+
+
+def get_monthly_spend(user_id, start, end):
+    conn = get_db()
+    try:
+        return conn.execute(
+            "SELECT substr(date, 1, 7) AS month, SUM(amount) AS total FROM expenses "
+            "WHERE user_id = ? AND date >= ? AND date <= ? "
+            "GROUP BY month",
+            (user_id, start.isoformat(), end.isoformat()),
         ).fetchall()
     finally:
         conn.close()

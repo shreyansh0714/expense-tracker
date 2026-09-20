@@ -33,7 +33,7 @@ expense-tracker/
     ├── specs/                # one spec per step (/create-spec)
     ├── plans/                # one plan per spec (/implement-plan)
     ├── commands/             # slash commands (see "Commands" below)
-    ├── agents/               # the 4 project subagents (see "Subagent policy")
+    ├── agents/               # the 5 project subagents (see "Subagent policy")
     └── PROGRESS.md           # route status, future features, known issues
 ```
 
@@ -115,6 +115,7 @@ Never write "X lives in file Y" without that `grep` passing.
 | `spendly-test-runner` | `/test-feature` step 2 | Runs that one file with `venv/bin/python -m pytest`, diagnoses failures | Read, Bash, Grep |
 | `spendly-security-reviewer` | `/code-review-feature` (parallel) | Security findings tagged Critical/High/Medium/Low — any finding blocks the commit | Read, Grep, Glob |
 | `spendly-quality-reviewer` | `/code-review-feature` (parallel) | Project-rule and maintainability review, ends with a verdict | Read, Grep, Glob |
+| `explorer` | `/explorer` (start of a session) | Read-only orientation: reads CLAUDE.md, PROGRESS.md, memory, latest spec/plan, git state, and returns one briefing. Never edits anything | Read, Grep, Glob, Bash (read-only git only) |
 
 - Subagent files load when a session starts. After adding or editing one,
   restart the session (`/exit`, then `claude --continue`) before relying on it.
@@ -244,6 +245,31 @@ https://claude.ai/artifact/6vjCPWhWYkaTTQqTYzvqu3
   every explanation and every spec/plan section from here on, not just
   the one that prompted this rule.
 
+## plain-brief keyword
+
+- When the developer types `/plain-brief` **or just writes "plain-brief"
+  in chat**, re-explain the latest report/status (or the named topic) in
+  the plain-brief format. Full definition + Bad/Good example:
+  `.claude/commands/plain-brief.md`. The 5 parts:
+  1. **Where we are** — the feature in plain words, the SDD step, what
+     just ran and why.
+  2. **Who's who** — one plain line for every function, file, subagent,
+     AC/FR number named.
+  3. **Before/after** — what the spec requires (quoted), what the code
+     did, what the user would actually see.
+  4. **Status table** — item → status → one-line reason.
+  5. **One direct question** at the end.
+- Use this format by default for any report that follows long or
+  background work (test runs, reviews, multi-agent tasks), even without
+  the keyword.
+- **Why:** added 2026-09-19. After a long run of subagent work, a
+  code-review report named `resolve_date_range`, `format_day`, reviewer
+  subagents and AC numbers with no reminder of what any of them were.
+  The developer, verbatim: "its like running an organization and as a
+  owner or boss , i cant remember every function and every single peice
+  of code and there reference ... you just made me frustated." The
+  corrected briefing followed the 5 parts above.
+
 ## Session scope convention
 
 - Don't bundle a whole page's worth of work into one uninterrupted
@@ -361,6 +387,8 @@ workflow uses them:
 | `/test-feature <spec-name>` | Writes tests from the spec, runs them, reports pass/fail + any `SPEC GAP:` lines |
 | `/code-review-feature <spec-name>` | Parallel security + quality review of `git diff main` and new files, one unified verdict |
 | `/seed-user`, `/seed-expense` | Add dummy data to `database.db` for manual testing |
+| `/explorer` | Start-of-session orientation: launches the `explorer` subagent and shows its briefing |
+| `/plain-brief [topic]` | Re-explains the latest report (or a topic) in the plain-brief format (see "plain-brief keyword" above) |
 
 No lint/format tooling is configured — don't assume `black`/`flake8`/`ruff` are available.
 
