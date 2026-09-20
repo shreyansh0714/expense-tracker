@@ -265,7 +265,7 @@ Matching the picture:
 - [x] 8. `/test-feature 06-date-time-filter`: the test-writer updates the tests from the spec only, then the runner runs them
 - [x] 9. `/code-review-feature 06-date-time-filter`
 - [x] 10. The developer's final Manual Verification pass — passed 2026-09-20
-- [ ] 11. Git finish, only on the developer's yes. One PR with everything, including the 3 PNGs and the plain-brief/explorer files
+- [x] 11. Git finish, only on the developer's yes. One PR with everything, including the 3 PNGs and the plain-brief/explorer files — done 2026-09-20, commit `2fb0571`, merged as `4d724ae`
 
 ### Verification
 - Browser checks on a **throwaway** database: test server on port 5055, screenshots of the card's 3 states, the table and the filter bar, then clean up the server, the database and `.playwright-mcp/`.

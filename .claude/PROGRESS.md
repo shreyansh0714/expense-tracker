@@ -180,7 +180,9 @@ unfinished. Flip a row to Implemented in the same commit that builds it.
       notes corrected)
 - [x] Developer's Manual Verification Guide pass (Validate) — confirmed by
       the developer on 2026-09-20
-- [ ] Commit, push, PR, merge
+- [x] Commit, push, PR, merge — `2fb0571` "implement 06 feature
+      date-time-filter , add the monthly budget button", merged to `main`
+      on 2026-09-20 (`4d724ae`)
 
 ## Future Features
 
