@@ -711,6 +711,25 @@ a { color: inherit; text-decoration: none; }
 
 .auth-switch a:hover { text-decoration: underline; }
 
+/* --- ₹-prefixed amount input (profile budget + add expense) --- */
+.budget-input-group { display: flex; }
+
+.budget-input-prefix {
+    display: flex;
+    align-items: center;
+    padding: 0 0.8rem;
+    border: 1px solid var(--border);
+    border-right: none;
+    border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+    background: var(--paper-warm);
+    color: var(--ink-soft);
+}
+
+.budget-input-group .form-input {
+    min-width: 0;
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
 /* ------------------------------------------------------------------ */
 /* Profile page                                                        */
 /* ------------------------------------------------------------------ */

@@ -17,6 +17,7 @@ from database.db import (
     get_user_by_email,
     get_user_by_id,
     init_db,
+    insert_expense,
     seed_db,
     update_monthly_budget,
     update_user,
@@ -61,6 +62,9 @@ DATE_RANGES = {
     "all_time": "All time",
     "custom": "Custom range",
 }
+
+EXPENSE_CATEGORIES = ["Food", "Transport", "Bills", "Health", "Entertainment", "Shopping", "Other"]
+MAX_EXPENSE_AMOUNT = 10_000_000  # ₹1 crore
 
 
 def resolve_date_range(args, history_start, today):
@@ -285,6 +289,7 @@ def profile():
         "show_budget_subtext": budget is not None and single_month,
         "monthly_budget_rows": monthly_budget_rows,
         "today": date.today(),
+        "new_expense_id": session.pop("new_expense_id", None),
     }
 
     if request.method == "GET":
@@ -395,9 +400,74 @@ def save_budget():
     return redirect(url_for("profile", **filter_args))
 
 
-@app.route("/expenses/add")
+@app.route("/expenses/add", methods=["GET", "POST"])
 def add_expense():
-    return "Add expense — coming in Step 7"
+    if "user_id" not in session:
+        flash("Please sign in to add an expense.", "error")
+        return redirect(url_for("login"))
+
+    user = get_user_by_id(session["user_id"])
+    today = date.today()
+    page = {
+        "categories": EXPENSE_CATEGORIES,
+        "today": today.isoformat(),
+        "budget": user["monthly_budget"],
+        "month_spent": sum(
+            row["total"] for row in get_monthly_spend(user["id"], today.replace(day=1), today)
+        ),
+    }
+
+    if request.method == "GET":
+        return render_template("add_expense.html", date=today.isoformat(), **page)
+
+    amount_raw = request.form.get("amount", "").strip()
+    category = request.form.get("category", "")
+    date_raw = request.form.get("date", "").strip()
+    description = request.form.get("description", "").strip()
+
+    try:
+        amount = float(amount_raw.replace(",", "").replace(" ", ""))
+        amount = round(amount, 2) if math.isfinite(amount) else None
+    except ValueError:
+        amount = None
+    try:
+        expense_date = datetime.strptime(date_raw, "%Y-%m-%d").date()
+    except ValueError:
+        expense_date = None
+
+    if not amount_raw:
+        error = "Please enter an amount."
+    elif amount is None or amount <= 0:
+        error = "Amount must be a number greater than 0."
+    elif amount > MAX_EXPENSE_AMOUNT:
+        error = "Amount can't be more than ₹1,00,00,000.00."
+    elif category not in EXPENSE_CATEGORIES:
+        error = "Please choose a category."
+    elif expense_date is None:
+        error = "Please enter a valid date."
+    elif expense_date > today:
+        error = "Date can't be in the future."
+    elif len(description) > 200:
+        error = "Description must be 200 characters or fewer."
+    else:
+        error = None
+
+    if error:
+        return render_template(
+            "add_expense.html",
+            error=error,
+            amount=amount_raw,
+            category=category,
+            date=date_raw,
+            description=description,
+            **page,
+        )
+
+    session["new_expense_id"] = insert_expense(
+        user["id"], amount, category, expense_date.isoformat(), description or None
+    )
+    flash("Expense added.", "success")
+    return redirect(url_for("profile"))
 
 
 @app.route("/expenses/<int:id>/edit")
