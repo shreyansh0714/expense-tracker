@@ -1,0 +1,29 @@
+/* ------------------------------------------------------------------ */
+/* Add expense (Step 7)                                                */
+/* ------------------------------------------------------------------ */
+
+/* The form reuses the auth-card/form-input/btn-submit styles and the
+   ₹-prefix input from style.css; only page-specific bits live here. */
+
+.budget-context {
+    margin-bottom: 1.25rem;
+    padding: 0.6rem 0.8rem;
+    border-radius: var(--radius-sm);
+    background: var(--accent-light);
+    color: var(--accent);
+    font-size: 0.9rem;
+}
+
+.expense-form-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.expense-cancel {
+    font-size: 0.9rem;
+    color: var(--ink-muted);
+}
+
+.expense-cancel:hover { color: var(--ink); }

@@ -162,7 +162,10 @@
         <div class="auth-card">
             <div class="card-header">
                 <h2 class="profile-card-title">Recent Transactions</h2>
-                <a href="{{ url_for('analytics') }}" class="card-header-link">View all</a>
+                <div class="card-header-links">
+                    <a href="{{ url_for('add_expense') }}" class="card-header-link">{{ icons.plus() }} Add expense</a>
+                    <a href="{{ url_for('analytics') }}" class="card-header-link">View all</a>
+                </div>
             </div>
             {% if recent_expenses %}
             <table class="transactions-table">
@@ -176,7 +179,7 @@
                 </thead>
                 <tbody>
                     {% for expense in recent_expenses %}
-                    <tr>
+                    <tr{% if expense.id == new_expense_id %} class="row-new"{% endif %}>
                         <td>{{ expense.date }}</td>
                         <td>{{ expense.description or "—" }}</td>
                         <td><span class="category-pill" data-category="{{ expense.category|lower }}">{{ expense.category }}</span></td>
@@ -189,7 +192,7 @@
             {% if has_expenses %}
             <p class="profile-empty-state">No expenses between {{ range_start_label }} and {{ range_end_label }}. Try a wider range.</p>
             {% else %}
-            <p class="profile-empty-state">You haven't logged any expenses yet.</p>
+            <p class="profile-empty-state">You haven't logged any expenses yet. <a href="{{ url_for('add_expense') }}" class="empty-state-link">Add your first expense</a></p>
             {% endif %}
             {% endif %}
         </div>
@@ -218,7 +221,7 @@
             {% if has_expenses %}
             <p class="profile-empty-state">No expenses between {{ range_start_label }} and {{ range_end_label }}. Try a wider range.</p>
             {% else %}
-            <p class="profile-empty-state">You haven't logged any expenses yet.</p>
+            <p class="profile-empty-state">You haven't logged any expenses yet. <a href="{{ url_for('add_expense') }}" class="empty-state-link">Add your first expense</a></p>
             {% endif %}
             {% endif %}
         </div>

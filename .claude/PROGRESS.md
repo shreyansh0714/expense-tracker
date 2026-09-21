@@ -27,7 +27,7 @@ unfinished. Flip a row to Implemented in the same commit that builds it.
 | `GET/POST /profile` | Implemented — Steps 4-6 + 6b, dashboard + edit modal + date filter (`?range=…`), restructured to the single-flow layout |
 | `POST /profile/budget` | Implemented — Step 6 Revision 1, saves/removes the monthly budget (from the range+budget bar since Step 6b), redirects back to `/profile` with the current filter |
 | `GET /analytics` | Implemented — Analytics "coming soon" page, login-required (redirects to `login`) |
-| `GET /expenses/add` | Stub — Step 7 |
+| `GET/POST /expenses/add` | Implemented — Step 7, add-expense form + this month's budget line, login-required; saves and redirects to `/profile` with a toast + highlighted row |
 | `GET /expenses/<id>/edit` | Stub — Step 8 |
 | `GET /expenses/<id>/delete` | Stub — Step 9 |
 | `database/db.py` | Implemented — Step 1 tables + helpers added by later steps |
@@ -216,6 +216,25 @@ than `07` because Steps 7-9 are already reserved for the expense CRUD stubs.
 - [x] **Hand-drawn card borders fixed** — see the Open Tasks entry; they had
       never rendered on any card but the page header
 
+### Step 7 — Add Expense (2026-09-22)
+
+Spec `.claude/specs/07-add-expense-button.md`, plan
+`.claude/plans/07-add-expense-button.md`, branch `feature/add-expense-button`.
+
+- [x] `database/db.py`: `insert_expense()`, shaped like `create_user`
+- [x] `GET/POST /expenses/add`:
+      - Fields: Amount (₹), Category (dropdown of the 7 categories in `EXPENSE_CATEGORIES`), Date (today or earlier), Description (optional, ≤200 chars)
+      - The 7 exact error messages from spec FR6
+      - Read-only line: "₹X of ₹Y used this month", or "No monthly budget set"
+- [x] After saving: redirect to `/profile`, "Expense added." toast, and the new row fades from green once (`session["new_expense_id"]`, popped on the next load; no animation under `prefers-reduced-motion`)
+- [x] Links to the page:
+      - navbar **Add expense** (signed-in only)
+      - **+ Add expense** next to "View all" on Recent Transactions
+      - **Add your first expense** after both "You haven't logged any expenses yet." messages (supersedes spec 06b line 204)
+- [x] ₹-prefix input styles moved from `profile.css` to `style.css`, shared by both pages
+- [x] Existing suite as a regression check: 69 pass, 1 fails. The failing test fails with or without Step 7; it's the UTC-vs-local bug logged in **Open Tasks**
+- [ ] Validate (Manual Verification Guide), `/test-feature`, `/code-review-feature`: **skipped by the developer's explicit choice (2026-09-22)**, committed and merged without them. Run them later to close this out
+
 ## Future Features
 
 Deferred because they need infrastructure this project doesn't have yet,
@@ -255,5 +274,6 @@ against the live code.
 | `app.py` — `profile()` route's `dashboard` dict (Step 6) | One dict holds both the date-filter values and unrelated profile values (`member_since`, `original_email`). Naming nit only, no bug. Optional, from the Step 6 code review | Cleanup |
 | `/seed-expense` command (`.claude/commands/seed-expense.md`) | Creates expenses dated in the **future**. In `database.db` on 2026-09-19, user 6 has expenses up to 2026-09-23 and user 8 up to 2026-09-26. The Step 6 date filter never shows anything after today, so those seeded rows are invisible on `/profile`. Fix: cap seeded dates at today | Bug |
 | Profile page (`templates/profile.html`, the Recent Transactions and By Category cards) | The same 4-line empty-state `{% if has_expenses %}` / `{% else %}` block is pasted twice, once per card. Both render the identical two FR8 messages, so a wording change has to be made in two places. Fix: extract a `{% macro empty_state() %}` alongside the existing `budget_form()` macro and call it from both cards. Raised by `spendly-quality-reviewer` in the Step 6b review (2026-09-20) as non-blocking — deferred rather than fixed because a third copy doesn't exist yet | Cleanup |
+| `app.py` `profile()` — `created_at` vs `date.today()` (Step 6) | `users.created_at` is saved in **UTC** (`datetime('now')` in SQLite), but the profile page compares it with the **local** date (`date.today()`). Between 00:00 and 05:30 IST the UTC date is still yesterday, so a brand-new account's history start is a day early and the page reads "Showing 21 Sep 2026 – 22 Sep 2026" instead of "22 Sep – 22 Sep". Found 2026-09-22 00:46 IST: `test_06-date-time-filter.py::TestHistoryStartAdjustment::test_showing_line_for_fresh_user_starts_at_signup_date` fails at that hour, with or without the Step 7 changes (confirmed via `git stash`). Fix: store/compare in one timezone (e.g. `datetime('now', 'localtime')`, or convert `created_at` to local before `.date()`) | Bug |
 | CSRF protection (whole app) | No form in Spendly has CSRF protection yet. Not urgent for the Step 6 filter (GET forms that change nothing), but the edit-profile POST form would benefit. Raised as "FYI" by `spendly-security-reviewer` in the Step 6 review | Needs its own spec |
 | `.claude/specs/03-login-and-logout.md` | §8 Acceptance Criteria still all unchecked `- [ ]` in the spec itself, even though `.claude/plans/03-login-and-logout.md` documents completed manual verification with actual `curl` output — spec and plan are out of sync on completion status | Doc-only |

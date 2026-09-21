@@ -209,3 +209,17 @@ def get_monthly_spend(user_id, start, end):
         ).fetchall()
     finally:
         conn.close()
+
+
+def insert_expense(user_id, amount, category, date, description):
+    conn = get_db()
+    try:
+        cur = conn.execute(
+            "INSERT INTO expenses (user_id, amount, category, date, description) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (user_id, amount, category, date, description),
+        )
+        conn.commit()
+        return cur.lastrowid
+    finally:
+        conn.close()
