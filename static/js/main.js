@@ -68,6 +68,73 @@
     });
 })();
 
+// Profile: delete-expense popup, opened from each row's trash button
+(function () {
+    var modal = document.getElementById("delete-expense-modal");
+    var form = document.getElementById("delete-expense-form");
+    if (!modal || !form) return;
+
+    var content = modal.querySelector(".modal-content");
+    var submitBtn = form.querySelector('button[type="submit"]');
+    var ANIMATION_MS = 420;
+    var currentRow = null;
+
+    function openModal(btn) {
+        currentRow = btn.closest("tr");
+        form.action = btn.dataset.action;
+        ["date", "description", "category", "amount"].forEach(function (key) {
+            // textContent, never innerHTML: the description is user input.
+            modal.querySelector('[data-field="' + key + '"]').textContent = btn.dataset[key];
+        });
+        submitBtn.disabled = false; // re-enable if the page came back from the back/forward cache
+        modal.hidden = false;
+        content.classList.remove("opening");
+        void content.offsetWidth; // force reflow so the animation replays every open
+        content.classList.add("opening");
+        setTimeout(function () {
+            content.classList.remove("opening");
+        }, ANIMATION_MS);
+    }
+
+    function closeModal() {
+        modal.hidden = true;
+    }
+
+    document.querySelectorAll(".row-delete-btn").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+            openModal(btn);
+        });
+    });
+    modal.querySelectorAll("[data-modal-close]").forEach(function (el) {
+        el.addEventListener("click", closeModal);
+    });
+
+    // Animate the row out first, then send the POST.
+    form.addEventListener("submit", function (e) {
+        e.preventDefault();
+        submitBtn.disabled = true;
+        closeModal();
+
+        var sent = false;
+        function send() {
+            if (sent) return;
+            sent = true;
+            form.submit(); // doesn't re-fire this submit listener
+        }
+
+        if (!currentRow || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+            send();
+            return;
+        }
+        currentRow.classList.add("row-deleting");
+        currentRow.addEventListener("animationend", function (ev) {
+            // Ignore a Step 7 row-new-fade still running on a just-added row.
+            if (ev.animationName === "row-delete") send();
+        });
+        setTimeout(send, 1000); // fallback in case animationend never fires
+    });
+})();
+
 // Profile: verification-code popup for email changes
 (function () {
     var form = document.getElementById("profile-form");
