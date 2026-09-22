@@ -279,9 +279,15 @@ developer's choice; nothing here depends on Step 8.
       a user, which signs you in, and never signed out), fixed in the test.
       No app code changed
 - [ ] `/code-review-feature 09-delete-button-feature`: **not run —
-      declined by the developer for now (2026-09-23)**. Required before
-      commit by the SDD workflow
-- [ ] Commit, push, PR, merge — not started; blocked on the code review
+      declined by the developer (2026-09-23)**, and the branch was
+      committed and pushed without it, the same call the developer made
+      for Step 7. The SDD workflow asks for it before a commit; run it
+      later to close this out
+- [x] Commit + push: `930a95e` "implement step 09 delete expense button
+      with confirm popup" on `feature/delete-button-feature`, pushed to
+      origin 2026-09-23. `.claude/hooks/` and `.claude/settings.json` were
+      deliberately left out (they belong to the `feature/copy-hooks` work)
+- [ ] PR + merge to `main`, then delete the branch
 
 ## Future Features
 

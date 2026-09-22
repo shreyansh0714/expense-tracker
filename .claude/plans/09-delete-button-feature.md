@@ -71,7 +71,7 @@ Decisions made after the spec was written (from the /implement-plan interview):
 **After Build (SDD steps 3–5)**
 - [x] 12. `/test-feature 09-delete-button-feature` — 20/20 pass (2026-09-22; first run 19/20, a test-side bug: the signed-out test never signed out after registering, fixed in the test)
 - [ ] 13. `/code-review-feature 09-delete-button-feature`
-- [~] 14. PROGRESS.md route row + Step 9 section: done 2026-09-23. Still pending: commit, PR, merge. Original wording: route row `GET /expenses/<id>/delete — Stub — Step 9` → `POST /expenses/<id>/delete — Implemented — Step 9`, plus a Step 9 section; then commit, PR and merge (only after the developer asks)
+- [~] 14. PROGRESS.md route row + Step 9 section done 2026-09-23; committed + pushed as `930a95e` (without the code review, developer's call). Still pending: PR + merge. Original wording: route row `GET /expenses/<id>/delete — Stub — Step 9` → `POST /expenses/<id>/delete — Implemented — Step 9`, plus a Step 9 section; then commit, PR and merge (only after the developer asks)
 
 ## Explicitly out of scope
 Same as spec §6: Edit (Step 8), Undo/soft delete, bulk delete, delete anywhere other than the `/profile` Recent Transactions rows, a no-JS fallback, CSRF, closing popups with Escape, changes to the Step 7 green highlight, and visual polish beyond existing tokens. Also not done here: a shared `openModal` helper (only two popups would use it) and a login-required decorator.
