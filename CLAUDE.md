@@ -390,6 +390,21 @@ workflow uses them:
 | `/explorer` | Start-of-session orientation: launches the `explorer` subagent and shows its briefing |
 | `/plain-brief [topic]` | Re-explains the latest report (or a topic) in the plain-brief format (see "plain-brief keyword" above) |
 
+### Deployment
+
+Live at **https://spendly-web-production-03e3.up.railway.app** (Railway
+project `spendly`, service `spendly-web`). Setup details and caveats live in
+`.claude/PROGRESS.md` → "Live deployment". Pushing to GitHub does **not**
+redeploy; to ship, from an up-to-date, clean `main`:
+
+```bash
+railway up --project 11bfa306-35fe-4e0d-bfc2-e9b06a3031e8 --environment production --service 4e2b952c-239d-4e05-8638-807cd1d96a09 --detach
+```
+
+It uploads the working folder minus `.gitignore`d files (so never
+`database.db`). The live database is on a Railway volume, separate from the
+local one.
+
 No lint/format tooling is configured — don't assume `black`/`flake8`/`ruff` are available.
 
 ## Critical rules

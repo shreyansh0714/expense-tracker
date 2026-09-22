@@ -11,6 +11,19 @@ Each item below names the session (by date) and commit (short hash + one-
 line message) it landed in, so you can `git show <hash>` to see exactly
 what changed.
 
+## Live deployment
+
+**URL: https://spendly-web-production-03e3.up.railway.app**
+
+| Item | Value |
+|---|---|
+| Host | Railway, project `spendly`, service `spendly-web`, environment `production` (free plan: the app sleeps when idle, so the first visit after a while takes a few seconds) |
+| Deployed | 2026-09-23 from local `main` at `3557900` (Steps 1–9, incl. Step 8 edit history), via `railway up` |
+| How it runs | Start command `sh -c 'ln -sf /data/database.db database.db && flask --app app run --host 0.0.0.0 --port ${PORT:-8080}'`: debug **off** (`app.py`'s `debug=True` only applies to `python app.py` locally), Flask's built-in server (fine for a demo; a production server like gunicorn would be a new package) |
+| Data | SQLite on a Railway volume `spendly-data` mounted at `/data`; the start command symlinks `database.db` to it, so data survives redeploys. Your local `database.db` was **not** uploaded (gitignored) — the live site starts with only the seeded demo user `demo@spendly.com` / `demo123` |
+| Secrets | `SECRET_KEY` set as a Railway variable (random, not in the repo) |
+| Auto-deploy on push | **No.** Railway's GitHub app isn't connected to `shreyansh0714/expense-tracker`, so pushing to GitHub does not redeploy. Redeploy by hand from an up-to-date `main` (see CLAUDE.md → Commands → Deployment), or connect the repo in the Railway dashboard to get deploy-on-push |
+
 ## Routes — implemented vs stub
 
 The fastest way to know what's safe to build on vs. what's intentionally
@@ -284,7 +297,8 @@ pencil next to Step 9's trash button, as the Step 9 spec anticipated.
       `/code-review-feature 08-edit-button-feature`: **not run — skipped by
       the developer (2026-09-23)**, committed and pushed without them, the
       same call made for Steps 7 and 9. Run them later to close this out
-- [ ] Commit + push, then PR + merge to `main`, then delete the branch
+- [x] Commit + push (`597e15f`, `ca7010a`), PR merged to `main` (`3557900`), deployed to Railway (see **Live deployment**)
+- [ ] Delete the `feature/edit-button-feature` branch (local + remote)
 
 ### Step 9 — Delete Expense (2026-09-22 – 2026-09-23)
 
