@@ -303,3 +303,53 @@
 @media (prefers-reduced-motion: reduce) {
     .row-new td { animation: none; }
 }
+
+/* --- Delete expense: trash button, confirm popup, row fade-out (Step 9) --- */
+/* The table is table-layout: fixed, so the icon column needs an explicit width. */
+.transactions-table th:last-child { width: 2.5rem; }
+.transactions-table td:last-child { padding-right: 0; text-align: right; }
+
+.row-delete-btn {
+    display: inline-flex;
+    padding: 0.3rem;
+    background: none;
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--ink-muted);
+    cursor: pointer;
+}
+
+.row-delete-btn:hover { color: var(--danger); background: var(--danger-light); }
+
+.delete-expense-details {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.4rem 1rem;
+    margin: 1rem 0;
+}
+
+.delete-expense-details dt { color: var(--ink-muted); font-size: 0.85rem; }
+.delete-expense-details dd { margin: 0; color: var(--ink); overflow-wrap: anywhere; }
+
+.delete-expense-warning { color: var(--danger); font-size: 0.9rem; }
+
+.delete-expense-actions { display: flex; gap: 0.75rem; margin-top: 1rem; }
+
+.delete-expense-actions > button {
+    flex: 1;
+    margin-top: 0;
+    font-family: var(--font-body);
+    cursor: pointer;
+}
+
+/* Declared after .row-new so it wins on a just-added row. Red flash, then fade; no collapse. */
+.row-deleting td { animation: row-delete 0.6s ease-in forwards; }
+
+@keyframes row-delete {
+    0%, 30% { background: var(--danger-light); color: var(--danger); opacity: 1; }
+    100%    { background: var(--danger-light); color: var(--danger); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .row-deleting td { animation: none; }
+}

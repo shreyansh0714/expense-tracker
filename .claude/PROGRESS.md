@@ -29,7 +29,7 @@ unfinished. Flip a row to Implemented in the same commit that builds it.
 | `GET /analytics` | Implemented — Analytics "coming soon" page, login-required (redirects to `login`) |
 | `GET/POST /expenses/add` | Implemented — Step 7, add-expense form + this month's budget line, login-required; saves and redirects to `/profile` with a toast + highlighted row |
 | `GET /expenses/<id>/edit` | Stub — Step 8 |
-| `GET /expenses/<id>/delete` | Stub — Step 9 |
+| `POST /expenses/<id>/delete` | Implemented — Step 9, deletes one of your own expenses after a confirm popup; 404 for anything else, redirects to `/profile` with the current filter + an "Expense deleted." toast |
 | `database/db.py` | Implemented — Step 1 tables + helpers added by later steps |
 
 **Do not implement a stub route unless the active task explicitly targets that step.**
@@ -234,6 +234,60 @@ Spec `.claude/specs/07-add-expense-button.md`, plan
 - [x] ₹-prefix input styles moved from `profile.css` to `style.css`, shared by both pages
 - [x] Existing suite as a regression check: 69 pass, 1 fails. The failing test fails with or without Step 7; it's the UTC-vs-local bug logged in **Open Tasks**
 - [ ] Validate (Manual Verification Guide), `/test-feature`, `/code-review-feature`: **skipped by the developer's explicit choice (2026-09-22)**, committed and merged without them. Run them later to close this out
+
+### Step 9 — Delete Expense (2026-09-22 – 2026-09-23)
+
+Spec `.claude/specs/09-delete-button-feature.md`, plan
+`.claude/plans/09-delete-button-feature.md`, branch
+`feature/delete-button-feature`. Built before Step 8 (Edit) on the
+developer's choice; nothing here depends on Step 8.
+
+- [x] `database/db.py`: `delete_expense(user_id, expense_id)` — one
+      `DELETE ... WHERE id = ? AND user_id = ?`, returns
+      `cur.rowcount == 1`. The `AND user_id = ?` *is* the ownership check
+- [x] `GET /expenses/<id>/delete` stub → `POST /expenses/<int:id>/delete`:
+      signed out → `login` + "Please sign in to delete an expense.";
+      missing/already-deleted/someone else's → the same `abort(404)`;
+      success → "Expense deleted." + redirect to `/profile` with the
+      `range`/`start`/`end` from the form (the `save_budget` pattern).
+      `abort` added to the flask import; the DB helper is imported as
+      `db_delete_expense` so the `url_for('delete_expense')` endpoint is
+      unchanged
+- [x] UI: `icons.trash()` macro; a 5th, icon-only column on Recent
+      Transactions (`aria-label="Delete expense"`, row values passed as
+      `data-*`); one `#delete-expense-modal` showing that expense's date,
+      description, category and amount, filled via `textContent`, rendered
+      only when `recent_expenses` is non-empty
+- [x] The popup opens with the existing `crumple-open` (`.opening`)
+      animation. On Delete: the row flashes `--danger-light` then fades
+      (0.6s, no collapse) and only then submits — via `animationend`
+      filtered to `animationName === "row-delete"` (so a Step 7
+      `row-new-fade` can't submit early), a 1s fallback timer and a `sent`
+      flag. Under `prefers-reduced-motion` it submits immediately
+- [x] New CSS: `.btn-danger` in `style.css`, and a Step 9 block in
+      `profile.css` (2.5rem last column — needed because the table is
+      `table-layout: fixed` — trash button, popup layout, `row-delete`
+      keyframes + reduced-motion guard). Tokens only, no new hex
+- [x] Existing suite as a regression check: 69 pass, 1 fails — the same
+      UTC-vs-local test logged in **Open Tasks**, which fails with or
+      without Step 9
+- [x] Validate (Manual Verification Guide): **done by the developer,
+      2026-09-23** — every step matched its expected result
+- [x] `/test-feature 09-delete-button-feature`: 20/20 pass
+      (`tests/test_09-delete-button-feature.py`). The first run was 19/20;
+      the one failure was a test-side bug (the signed-out test registered
+      a user, which signs you in, and never signed out), fixed in the test.
+      No app code changed
+- [ ] `/code-review-feature 09-delete-button-feature`: **not run —
+      declined by the developer (2026-09-23)**, and the branch was
+      committed and pushed without it, the same call the developer made
+      for Step 7. The SDD workflow asks for it before a commit; run it
+      later to close this out
+- [x] Commit + push: `930a95e` "implement step 09 delete expense button
+      with confirm popup" on `feature/delete-button-feature`, pushed to
+      origin 2026-09-23. `.claude/hooks/` and `.claude/settings.json` were
+      deliberately left out (they belong to the `feature/copy-hooks` work)
+- [ ] PR + merge to `main`, then delete the branch
 
 ## Future Features
 

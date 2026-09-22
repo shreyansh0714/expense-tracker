@@ -175,6 +175,7 @@
                         <th>Description</th>
                         <th>Category</th>
                         <th>Amount</th>
+                        <th></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -184,6 +185,14 @@
                         <td>{{ expense.description or "—" }}</td>
                         <td><span class="category-pill" data-category="{{ expense.category|lower }}">{{ expense.category }}</span></td>
                         <td>₹{{ expense.amount|inr }}</td>
+                        <td>
+                            <button type="button" class="row-delete-btn" aria-label="Delete expense"
+                                    data-action="{{ url_for('delete_expense', id=expense.id) }}"
+                                    data-date="{{ expense.date }}"
+                                    data-description="{{ expense.description or '—' }}"
+                                    data-category="{{ expense.category }}"
+                                    data-amount="₹{{ expense.amount|inr }}">{{ icons.trash() }}</button>
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -304,6 +313,36 @@
         </div>
     </div>
 </div>
+
+{% if recent_expenses %}
+<div id="delete-expense-modal" class="modal" hidden>
+    <div class="modal-overlay" data-modal-close></div>
+    <div class="modal-content">
+        <button type="button" class="modal-close" aria-label="Close" data-modal-close>&times;</button>
+        <div class="edit-profile-card">
+            <h2 class="profile-card-title">Delete this expense?</h2>
+            <dl class="delete-expense-details">
+                <dt>Date</dt><dd data-field="date"></dd>
+                <dt>Description</dt><dd data-field="description"></dd>
+                <dt>Category</dt><dd data-field="category"></dd>
+                <dt>Amount</dt><dd data-field="amount"></dd>
+            </dl>
+            <p class="delete-expense-warning">This can't be undone.</p>
+            <form method="post" action="" id="delete-expense-form">
+                <input type="hidden" name="range" value="{{ active_range }}">
+                {% if active_range == 'custom' %}
+                <input type="hidden" name="start" value="{{ range_start.isoformat() }}">
+                <input type="hidden" name="end" value="{{ range_end.isoformat() }}">
+                {% endif %}
+                <div class="delete-expense-actions">
+                    <button type="button" class="btn-ghost" data-modal-close>Cancel</button>
+                    <button type="submit" class="btn-submit btn-danger">Delete</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
 
 <div id="verification-modal" class="modal" hidden>
     <div class="modal-overlay" data-modal-close></div>

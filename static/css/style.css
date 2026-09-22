@@ -698,6 +698,10 @@ a { color: inherit; text-decoration: none; }
 
 .btn-submit:hover { background: var(--accent); }
 
+.btn-danger { background: var(--danger); color: var(--paper-card); }
+.btn-danger:hover { background: var(--ink); }
+.btn-danger:disabled { opacity: 0.6; cursor: default; }
+
 .auth-switch {
     text-align: center;
     font-size: 0.875rem;
@@ -1047,7 +1051,8 @@ textarea.form-input {
     text-align: center;
 }
 
-#edit-profile-modal .modal-content {
+#edit-profile-modal .modal-content,
+#delete-expense-modal .modal-content {
     max-width: 480px;
 }
 

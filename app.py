@@ -3,11 +3,12 @@ import os
 import sqlite3
 from datetime import date, datetime, timedelta
 
-from flask import Flask, flash, redirect, render_template, request, session, url_for
+from flask import Flask, abort, flash, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash
 
 from database.db import (
     create_user,
+    delete_expense as db_delete_expense,
     get_category_totals,
     get_db,
     get_first_expense_date,
@@ -475,9 +476,23 @@ def edit_expense(id):
     return "Edit expense — coming in Step 8"
 
 
-@app.route("/expenses/<int:id>/delete")
+@app.route("/expenses/<int:id>/delete", methods=["POST"])
 def delete_expense(id):
-    return "Delete expense — coming in Step 9"
+    if "user_id" not in session:
+        flash("Please sign in to delete an expense.", "error")
+        return redirect(url_for("login"))
+
+    # Missing, already deleted, or someone else's: the same 404 for all three.
+    if not db_delete_expense(session["user_id"], id):
+        abort(404)
+
+    filter_args = {
+        key: request.form[key]
+        for key in ("range", "start", "end")
+        if request.form.get(key)
+    }
+    flash("Expense deleted.", "success")
+    return redirect(url_for("profile", **filter_args))
 
 
 if __name__ == "__main__":

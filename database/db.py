@@ -223,3 +223,16 @@ def insert_expense(user_id, amount, category, date, description):
         return cur.lastrowid
     finally:
         conn.close()
+
+
+def delete_expense(user_id, expense_id):
+    conn = get_db()
+    try:
+        cur = conn.execute(
+            "DELETE FROM expenses WHERE id = ? AND user_id = ?",
+            (expense_id, user_id),
+        )
+        conn.commit()
+        return cur.rowcount == 1
+    finally:
+        conn.close()
