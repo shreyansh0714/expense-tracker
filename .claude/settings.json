@@ -1,0 +1,67 @@
+{
+  "_about": "Hooks in this project are safeguards: they block or flag actions that break Spendly's rules (CLAUDE.md), and can be used to fire a custom slash command on the event we want (a hook can't type the command itself, so its output tells Claude to run it, like the SessionStart hook below that fires /explorer). Scripts live in .claude/hooks/.",
+
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"SessionStart\",\"additionalContext\":\"Spendly session start: before answering the developer'\"'\"'s first message, run the /explorer slash command (.claude/commands/explorer.md): launch the explorer subagent and relay its briefing as-is. Then handle the developer'\"'\"'s first message instead of asking what they want to work on. Skip this if the first message is itself /explorer.\"}}'"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/pre_bash.py\"",
+            "statusMessage": "Checking Spendly safeguards"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/post_edit.py\"",
+            "statusMessage": "Checking Python syntax and SQL"
+          }
+        ]
+      }
+    ]
+  },
+
+  "_exampleHooks": {
+    "_note": "NOT ACTIVE — reference examples only (outside the \"hooks\" key, so Claude Code ignores them). Replaced on 2026-09-22: the black formatter isn't installed (and CLAUDE.md forbids new pip packages), and the rm-guard protected files this project doesn't have (spendly.db, .env, migrations/) and false-positived on words like 'perform'.",
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -c \"\nimport sys, json, subprocess\ndata = json.load(sys.stdin)\nfile = data.get('tool_input', {}).get('file_path', '')\nif file.endswith('.py'):\n    subprocess.run(['python3', '-m', 'black', '--quiet', file])\n\""
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -c \"\nimport sys, json\ndata = json.load(sys.stdin)\ncmd = data.get('tool_input', {}).get('command', '')\nprotected = ['spendly.db', '.env', 'migrations/']\ndangerous = ['rm ', 'rm -', 'unlink ', 'truncate ']\nfor d in dangerous:\n    if d in cmd:\n        for p in protected:\n            if p in cmd:\n                print(f'BLOCKED: Cannot run destructive command on protected file: {p}', file=__import__(\\\"sys\\\").stderr)\n                raise SystemExit(2)\n\""
+          }
+        ]
+      }
+    ]
+  }
+}
