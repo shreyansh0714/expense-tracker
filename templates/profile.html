@@ -181,8 +181,11 @@
                 <tbody>
                     {% for expense in recent_expenses %}
                     <tr id="expense-{{ expense.id }}"{% if expense.id == new_expense_id %} class="row-new"{% endif %}>
-                        <td>{{ expense.date }}</td>
-                        <td>{{ expense.description or "—" }}{% if expense.updated_at %} <span class="edited-tag">edited</span>{% endif %}</td>
+                        <td>{% if expense.updated_at %}<button type="button" class="edited-badge"
+                                    data-history="edit-history-{{ expense.id }}"
+                                    data-tooltip="Edited {{ expense.updated_at|local_time }} · click for history"
+                                    aria-label="Edited {{ expense.updated_at|local_time }}, show edit history">{{ icons.edit(10) }}</button>{% endif %}{{ expense.date }}</td>
+                        <td>{{ expense.description or "—" }}</td>
                         <td><span class="category-pill" data-category="{{ expense.category|lower }}">{{ expense.category }}</span></td>
                         <td>₹{{ expense.amount|inr }}</td>
                         <td>
@@ -347,6 +350,39 @@
         </div>
     </div>
 </div>
+{% endif %}
+
+{% if edit_history %}
+<div id="edit-history-modal" class="modal" hidden>
+    <div class="modal-overlay" data-modal-close></div>
+    <div class="modal-content">
+        <button type="button" class="modal-close" aria-label="Close" data-modal-close>&times;</button>
+        <div class="edit-profile-card">
+            <h2 class="profile-card-title">Edit history</h2>
+            <div data-history-body></div>
+            <div class="delete-expense-actions">
+                <button type="button" class="btn-ghost" data-modal-close>Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% for expense in recent_expenses if expense.id in edit_history %}
+<template id="edit-history-{{ expense.id }}">
+    <p class="edit-history-current">{{ expense.date }} · {{ expense.category }} · ₹{{ expense.amount|inr }} · {{ expense.description or "—" }}</p>
+    <ol class="edit-history-list">
+        {% for edit in edit_history[expense.id] %}
+        <li class="edit-history-entry">
+            <p class="edit-history-when">{{ edit.when }}</p>
+            <ul class="edit-history-changes">
+                {% for label, old, new in edit.changes %}
+                <li><span class="edit-history-field">{{ label }}:</span> <del>{{ old }}</del> → <ins>{{ new }}</ins></li>
+                {% endfor %}
+            </ul>
+        </li>
+        {% endfor %}
+    </ol>
+</template>
+{% endfor %}
 {% endif %}
 
 <div id="verification-modal" class="modal" hidden>

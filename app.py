@@ -1,7 +1,7 @@
 import math
 import os
 import sqlite3
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 from flask import Flask, abort, flash, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash
@@ -12,6 +12,7 @@ from database.db import (
     get_category_totals,
     get_db,
     get_expense,
+    get_expense_edits,
     get_first_expense_date,
     get_monthly_spend,
     get_recent_expenses,
@@ -56,6 +57,30 @@ def format_inr(amount):
 
 def format_day(d):
     return f"{d.day} {d.strftime('%b %Y')}"
+
+
+@app.template_filter("local_time")
+def local_time(utc_text):
+    """SQLite's UTC '2026-09-22 19:39:21' -> '23 Sep 2026, 1:09 AM' in this computer's time zone."""
+    dt = datetime.strptime(utc_text, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc).astimezone()
+    return f"{format_day(dt)}, {dt.strftime('%I:%M %p').lstrip('0')}"
+
+
+EDIT_FIELDS = (
+    ("Amount", "amount", lambda v: f"₹{format_inr(v)}"),
+    ("Category", "category", str),
+    ("Date", "date", str),
+    ("Description", "description", lambda v: v or "—"),
+)
+
+
+def edit_changes(edit):
+    """The fields one expense_edits row changed, as (label, old, new) display strings."""
+    return [
+        (label, show(edit[f"old_{key}"]), show(edit[f"new_{key}"]))
+        for label, key, show in EDIT_FIELDS
+        if edit[f"old_{key}"] != edit[f"new_{key}"]
+    ]
 
 
 DATE_RANGES = {
@@ -327,13 +352,22 @@ def profile():
             budget, range_start, range_end,
             get_monthly_spend(user["id"], range_start, range_end),
         )
+    recent_expenses = get_recent_expenses(user["id"], range_start, range_end)
+    edit_history = {}
+    edited_ids = [expense["id"] for expense in recent_expenses if expense["updated_at"]]
+    for edit in get_expense_edits(user["id"], edited_ids):
+        edit_history.setdefault(edit["expense_id"], []).append({
+            "when": local_time(edit["edited_at"]),
+            "changes": edit_changes(edit),
+        })
     dashboard = {
         "member_since": created_at.strftime("%b %Y"),
         "category_totals": category_totals,
         "monthly_total": sum(row["total"] for row in category_totals),
         "transaction_count": get_transaction_count(user["id"], range_start, range_end),
         "top_category": category_totals[0]["category"] if category_totals else None,
-        "recent_expenses": get_recent_expenses(user["id"], range_start, range_end),
+        "recent_expenses": recent_expenses,
+        "edit_history": edit_history,
         "original_email": user["email"],
         "budget_amount": user["monthly_budget"],
         "budget_input": "" if budget is None else format_inr(budget).removesuffix(".00"),

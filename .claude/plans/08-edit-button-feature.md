@@ -104,6 +104,19 @@ passes nothing new** and the Add page keeps rendering exactly as before:
   is built once in the template (`back_to`) and used by both the form's `data-back-to` and the
   Cancel link.
 
+### 8. Edit history (spec FR21–FR25, added 2026-09-23)
+- **Storage:** one `expense_edits` row per edit holding old and new values for all 4 fields. The
+  "changed fields" list is computed when displaying, so no per-field rows are needed.
+  `update_expense()` reads the old row, updates it and inserts history on one connection before
+  one `commit()`, so an edit and its history can't get separated.
+- **Popup data:** rendered server-side into `<template>` elements for the ≤5 shown rows, then
+  copied into the popup by JS. There's no JSON endpoint and no `fetch`, and Jinja autoescaping
+  keeps descriptions safe.
+- **Time:** stored UTC (like `created_at`). A small `local_time` helper converts it with
+  `astimezone()` for the tooltip and the popup. The edit page's "Last edited" line is left as is.
+- **Old badges:** FR25's `UPDATE … WHERE id NOT IN (SELECT expense_id FROM expense_edits)` runs in
+  `init_db()` and is idempotent.
+
 ### Judgment calls
 | Call | Why |
 |---|---|
@@ -122,11 +135,17 @@ passes nothing new** and the Add page keeps rendering exactly as before:
 - [x] 4. `app.py`: import the two new DB helpers, replace the `edit_expense` stub with the GET/POST route
 - [x] 5. `templates/add_expense.html`: `expense` switch (title/heading/subtitle/action/button/Cancel), Currently + edited lines, filter hidden inputs
 - [x] 6. `static/css/add_expense.css`: `.expense-original`, `.expense-edited`
-- [x] 7. `templates/profile.html`: pencil link before the trash button, `edited` tag in the Description cell
+- [x] 7. `templates/profile.html`: pencil link before the trash button, edited indicator (replaced by 9c)
 - [x] 8. `static/css/profile.css`: wider Actions column, shared `.row-edit-btn` style + hover, `.edited-tag`
 - [x] 9. Smoke-check that the app starts (`venv/bin/python -c "import app"`) with no errors against a throwaway DB copy, not the real `database.db`
 - [x] 9a. FR19 scroll: `#expense-<id>` anchor on both edit redirects (`app.py`), row `id` (`profile.html`), `scroll-margin-top` (`profile.css`)
 - [x] 9b. FR20 Back arrow: `back_to` URL + `id`/`data-back-to` on the edit form and Cancel (`add_expense.html`), new IIFE in `static/js/main.js`
+- [x] 9c. Edited indicator changed to a pencil badge in a yellow circle in the Date cell (developer request: the text tag was hard to see and got cut off by the Description "…"); spec FR6/AC7 updated
+- [x] 9d. `database/db.py`: `expense_edits` table + FR25 cleanup in `init_db()`; `update_expense()` records history in the same transaction; `get_expense_edits()`
+- [x] 9e. `app.py`: `local_time` formatting + `edit_changes()` helper; `profile()` passes `edit_history` for the shown rows
+- [x] 9f. `templates/profile.html`: badge → `<button>` with `data-tooltip`; `#edit-history-modal` + one `<template>` per edited row
+- [x] 9g. `static/css/profile.css`: instant tooltip, button reset, history list styles; `static/js/main.js`: history popup IIFE
+- [x] 9h. Smoke check (import + templates + JS syntax) on a throwaway DB
 - [x] 10. **Stop.** Hand over the spec's Manual Verification Guide (§9) to the developer
 - [ ] 11. `/test-feature 08-edit-button-feature` — **skipped by the developer, 2026-09-23**
 - [ ] 12. `/code-review-feature 08-edit-button-feature` — **skipped by the developer, 2026-09-23**

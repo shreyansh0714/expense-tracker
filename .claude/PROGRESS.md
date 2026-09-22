@@ -258,15 +258,26 @@ pencil next to Step 9's trash button, as the Step 9 spec anticipated.
       `expense`): Edit title/button, "Currently: …" line, "Last edited
       <date>" / "Never edited", filter hidden inputs
 - [x] Profile: pencil link (`icons.edit()`) before the trash button,
-      carrying the current filter; *edited* tag on edited rows; Actions
+      carrying the current filter; a yellow circle badge with a pencil by the date on
+      edited rows (hover: "Edited <date>"; replaced an *edited* text tag that
+      the Description column's "…" cut off); Actions
       column widened to 4.75rem
 - [x] Added after Build at the developer's request (spec FR19/FR20):
       redirects go to `#expense-<id>` so the page scrolls to the edited row
       (`scroll-margin-top` clears the sticky navbar); a `main.js` IIFE
       bounces a Back/Forward arrival at the edit page to that profile row
       with `location.replace()`, so Back never shows a stale edit form
+- [x] Edit history (spec FR21–FR25, added at the developer's request):
+      new `expense_edits` table (old + new values per edit, `ON DELETE
+      CASCADE`), written by `update_expense()` in the same commit; clicking
+      the yellow badge opens an **Edit history** popup (newest first, only
+      the changed fields, old struck through → new), filled from
+      server-rendered `<template>`s; the badge tooltip is now an instant CSS
+      one. Rows edited before history existed had their badge cleared
+      (`updated_at` → NULL) by `init_db()`, the developer's choice
 - [x] Existing suite as a regression check: 89 pass, 1 fails — the same
       UTC-vs-local test logged in **Open Tasks**
+- [x] Validate AC19–AC23 (edit history) and the reworked AC7 (badge): **done by the developer, 2026-09-23**
 - [x] Validate (Manual Verification Guide, AC1–AC18): **done by the
       developer, 2026-09-23**
 - [ ] `/test-feature 08-edit-button-feature` and
