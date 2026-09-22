@@ -306,9 +306,10 @@
 
 /* --- Delete expense: trash button, confirm popup, row fade-out (Step 9) --- */
 /* The table is table-layout: fixed, so the icon column needs an explicit width. */
-.transactions-table th:last-child { width: 2.5rem; }
-.transactions-table td:last-child { padding-right: 0; text-align: right; }
+.transactions-table th:last-child { width: 4.75rem; }
+.transactions-table td:last-child { padding-right: 0; text-align: right; white-space: nowrap; }
 
+.row-edit-btn,
 .row-delete-btn {
     display: inline-flex;
     padding: 0.3rem;
@@ -320,6 +321,18 @@
 }
 
 .row-delete-btn:hover { color: var(--danger); background: var(--danger-light); }
+
+/* --- Edit expense: pencil link, "edited" tag (Step 8) --- */
+/* Edit redirects to #expense-<id>; keep the row clear of the sticky navbar. */
+.transactions-table tr { scroll-margin-top: 6rem; }
+
+.row-edit-btn:hover { color: var(--accent); background: var(--accent-light); }
+
+.edited-tag {
+    font-size: 0.75rem;
+    font-style: italic;
+    color: var(--ink-muted);
+}
 
 .delete-expense-details {
     display: grid;

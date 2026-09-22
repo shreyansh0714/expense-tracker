@@ -180,12 +180,17 @@
                 </thead>
                 <tbody>
                     {% for expense in recent_expenses %}
-                    <tr{% if expense.id == new_expense_id %} class="row-new"{% endif %}>
+                    <tr id="expense-{{ expense.id }}"{% if expense.id == new_expense_id %} class="row-new"{% endif %}>
                         <td>{{ expense.date }}</td>
-                        <td>{{ expense.description or "—" }}</td>
+                        <td>{{ expense.description or "—" }}{% if expense.updated_at %} <span class="edited-tag">edited</span>{% endif %}</td>
                         <td><span class="category-pill" data-category="{{ expense.category|lower }}">{{ expense.category }}</span></td>
                         <td>₹{{ expense.amount|inr }}</td>
                         <td>
+                            {# url_for drops None args, so start/end only appear for a custom range. #}
+                            <a class="row-edit-btn" aria-label="Edit expense"
+                               href="{{ url_for('edit_expense', id=expense.id, range=active_range,
+                                                start=range_start.isoformat() if active_range == 'custom' else none,
+                                                end=range_end.isoformat() if active_range == 'custom' else none) }}">{{ icons.edit() }}</a>
                             <button type="button" class="row-delete-btn" aria-label="Delete expense"
                                     data-action="{{ url_for('delete_expense', id=expense.id) }}"
                                     data-date="{{ expense.date }}"

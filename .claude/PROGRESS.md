@@ -28,7 +28,7 @@ unfinished. Flip a row to Implemented in the same commit that builds it.
 | `POST /profile/budget` | Implemented — Step 6 Revision 1, saves/removes the monthly budget (from the range+budget bar since Step 6b), redirects back to `/profile` with the current filter |
 | `GET /analytics` | Implemented — Analytics "coming soon" page, login-required (redirects to `login`) |
 | `GET/POST /expenses/add` | Implemented — Step 7, add-expense form + this month's budget line, login-required; saves and redirects to `/profile` with a toast + highlighted row |
-| `GET /expenses/<id>/edit` | Stub — Step 8 |
+| `GET/POST /expenses/<id>/edit` | Implemented — Step 8, edit page (shares `add_expense.html` and Add's validation) for one of your own expenses; 404 for anything else, redirects to `/profile` with the current filter, scrolled to the row (`#expense-<id>`), with an "Expense updated." toast |
 | `POST /expenses/<id>/delete` | Implemented — Step 9, deletes one of your own expenses after a confirm popup; 404 for anything else, redirects to `/profile` with the current filter + an "Expense deleted." toast |
 | `database/db.py` | Implemented — Step 1 tables + helpers added by later steps |
 
@@ -234,6 +234,46 @@ Spec `.claude/specs/07-add-expense-button.md`, plan
 - [x] ₹-prefix input styles moved from `profile.css` to `style.css`, shared by both pages
 - [x] Existing suite as a regression check: 69 pass, 1 fails. The failing test fails with or without Step 7; it's the UTC-vs-local bug logged in **Open Tasks**
 - [ ] Validate (Manual Verification Guide), `/test-feature`, `/code-review-feature`: **skipped by the developer's explicit choice (2026-09-22)**, committed and merged without them. Run them later to close this out
+
+### Step 8 — Edit Expense (2026-09-23)
+
+Spec `.claude/specs/08-edit-button-feature.md`, plan
+`.claude/plans/08-edit-button-feature.md`, branch
+`feature/edit-button-feature`. Built after Step 9 (Delete); it adds its
+pencil next to Step 9's trash button, as the Step 9 spec anticipated.
+
+- [x] `database/db.py`: new nullable `expenses.updated_at` column (in
+      `CREATE TABLE` + an idempotent `ALTER TABLE` in `init_db()`, same
+      pattern as `users.monthly_budget`/`notes`); `get_expense()` and
+      `update_expense()`, both scoped by `WHERE id = ? AND user_id = ?`
+- [x] `app.py`: Add expense's parsing + 7 checks moved into
+      `parse_expense_form()` and its budget line into
+      `expense_page_context()`, now shared by Add and Edit. The
+      `"coming in Step 8"` stub became `GET/POST /expenses/<int:id>/edit`:
+      signed out → `login` + "Please sign in to edit an expense.";
+      missing/someone else's → `abort(404)`; identical values → "No changes
+      to save." with nothing written; success → "Expense updated.", the
+      row highlighted (reuses `session["new_expense_id"]`)
+- [x] `templates/add_expense.html` serves both pages (switches on
+      `expense`): Edit title/button, "Currently: …" line, "Last edited
+      <date>" / "Never edited", filter hidden inputs
+- [x] Profile: pencil link (`icons.edit()`) before the trash button,
+      carrying the current filter; *edited* tag on edited rows; Actions
+      column widened to 4.75rem
+- [x] Added after Build at the developer's request (spec FR19/FR20):
+      redirects go to `#expense-<id>` so the page scrolls to the edited row
+      (`scroll-margin-top` clears the sticky navbar); a `main.js` IIFE
+      bounces a Back/Forward arrival at the edit page to that profile row
+      with `location.replace()`, so Back never shows a stale edit form
+- [x] Existing suite as a regression check: 89 pass, 1 fails — the same
+      UTC-vs-local test logged in **Open Tasks**
+- [x] Validate (Manual Verification Guide, AC1–AC18): **done by the
+      developer, 2026-09-23**
+- [ ] `/test-feature 08-edit-button-feature` and
+      `/code-review-feature 08-edit-button-feature`: **not run — skipped by
+      the developer (2026-09-23)**, committed and pushed without them, the
+      same call made for Steps 7 and 9. Run them later to close this out
+- [ ] Commit + push, then PR + merge to `main`, then delete the branch
 
 ### Step 9 — Delete Expense (2026-09-22 – 2026-09-23)
 

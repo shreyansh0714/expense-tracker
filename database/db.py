@@ -34,6 +34,7 @@ def init_db():
             date TEXT NOT NULL,
             description TEXT,
             created_at TEXT DEFAULT (datetime('now')),
+            updated_at TEXT,
             FOREIGN KEY (user_id) REFERENCES users(id)
         )
     """)
@@ -45,6 +46,10 @@ def init_db():
             conn.execute(f"ALTER TABLE users ADD COLUMN {column} {coltype}")
         except sqlite3.OperationalError:
             pass
+    try:
+        conn.execute("ALTER TABLE expenses ADD COLUMN updated_at TEXT")
+    except sqlite3.OperationalError:
+        pass
     conn.commit()
     conn.close()
 
@@ -221,6 +226,31 @@ def insert_expense(user_id, amount, category, date, description):
         )
         conn.commit()
         return cur.lastrowid
+    finally:
+        conn.close()
+
+
+def get_expense(user_id, expense_id):
+    conn = get_db()
+    try:
+        return conn.execute(
+            "SELECT * FROM expenses WHERE id = ? AND user_id = ?",
+            (expense_id, user_id),
+        ).fetchone()
+    finally:
+        conn.close()
+
+
+def update_expense(user_id, expense_id, amount, category, date, description):
+    conn = get_db()
+    try:
+        cur = conn.execute(
+            "UPDATE expenses SET amount = ?, category = ?, date = ?, description = ?, "
+            "updated_at = datetime('now') WHERE id = ? AND user_id = ?",
+            (amount, category, date, description, expense_id, user_id),
+        )
+        conn.commit()
+        return cur.rowcount == 1
     finally:
         conn.close()
 

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Add expense — Spendly{% endblock %}
+{% block title %}{% if expense %}Edit expense{% else %}Add expense{% endif %} — Spendly{% endblock %}
 
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/add_expense.css') }}">
@@ -12,8 +12,13 @@
     <div class="auth-container">
 
         <div class="auth-header">
+            {% if expense %}
+            <h1 class="auth-title">Edit expense</h1>
+            <p class="auth-subtitle">Fix a mistake in something you logged.</p>
+            {% else %}
             <h1 class="auth-title">Add an expense</h1>
             <p class="auth-subtitle">Log something you spent money on.</p>
+            {% endif %}
         </div>
 
         <div class="auth-card">
@@ -25,11 +30,26 @@
                 {% endif %}
             </p>
 
+            {% if expense %}
+            <p class="expense-original">Currently: {{ expense.date }} · {{ expense.category }} · ₹{{ expense.amount|inr }} · {{ expense.description or "—" }}</p>
+            <p class="expense-edited">{% if expense.updated_at %}Last edited {{ expense.updated_at[:10] }}{% else %}Never edited{% endif %}</p>
+            {% endif %}
+
             {% if error %}
             <div class="auth-error">{{ error }}</div>
             {% endif %}
 
+            {% if expense %}
+            <form method="POST" action="{{ url_for('edit_expense', id=expense.id) }}"
+                  id="edit-expense-form" data-back-to="{{ back_to }}">
+            {% else %}
             <form method="POST" action="{{ url_for('add_expense') }}">
+            {% endif %}
+                {% if expense %}
+                {% for key, value in filter_args.items() %}
+                <input type="hidden" name="{{ key }}" value="{{ value }}">
+                {% endfor %}
+                {% endif %}
                 <div class="form-group">
                     <label for="amount">Amount</label>
                     <div class="budget-input-group">
@@ -60,8 +80,8 @@
                            value="{{ description or '' }}">
                 </div>
                 <div class="expense-form-actions">
-                    <button type="submit" class="btn-submit">Add expense</button>
-                    <a href="{{ url_for('profile') }}" class="expense-cancel">Cancel</a>
+                    <button type="submit" class="btn-submit">{% if expense %}Save changes{% else %}Add expense{% endif %}</button>
+                    <a href="{{ back_to if expense else url_for('profile') }}" class="expense-cancel">Cancel</a>
                 </div>
             </form>
         </div>
