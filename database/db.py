@@ -1,3 +1,4 @@
+import json
 import sqlite3
 from datetime import date
 from werkzeug.security import generate_password_hash
@@ -50,6 +51,28 @@ def init_db():
         conn.execute("ALTER TABLE expenses ADD COLUMN updated_at TEXT")
     except sqlite3.OperationalError:
         pass
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS expense_edits (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            expense_id INTEGER NOT NULL,
+            edited_at TEXT NOT NULL,
+            old_amount REAL NOT NULL,
+            new_amount REAL NOT NULL,
+            old_category TEXT NOT NULL,
+            new_category TEXT NOT NULL,
+            old_date TEXT NOT NULL,
+            new_date TEXT NOT NULL,
+            old_description TEXT,
+            new_description TEXT,
+            FOREIGN KEY (expense_id) REFERENCES expenses(id) ON DELETE CASCADE
+        )
+    """)
+    # Edits saved before expense_edits existed have no history to show, so
+    # they lose their "edited" badge. A no-op once every edit writes history.
+    conn.execute(
+        "UPDATE expenses SET updated_at = NULL WHERE updated_at IS NOT NULL "
+        "AND id NOT IN (SELECT expense_id FROM expense_edits)"
+    )
     conn.commit()
     conn.close()
 
@@ -242,15 +265,52 @@ def get_expense(user_id, expense_id):
 
 
 def update_expense(user_id, expense_id, amount, category, date, description):
+    """Update one of the user's expenses and record the change in expense_edits.
+
+    Both writes share one commit, so an edit never exists without its history.
+    """
     conn = get_db()
     try:
-        cur = conn.execute(
+        old = conn.execute(
+            "SELECT * FROM expenses WHERE id = ? AND user_id = ?",
+            (expense_id, user_id),
+        ).fetchone()
+        if old is None:
+            return False
+        now = conn.execute("SELECT datetime('now')").fetchone()[0]
+        conn.execute(
             "UPDATE expenses SET amount = ?, category = ?, date = ?, description = ?, "
-            "updated_at = datetime('now') WHERE id = ? AND user_id = ?",
-            (amount, category, date, description, expense_id, user_id),
+            "updated_at = ? WHERE id = ? AND user_id = ?",
+            (amount, category, date, description, now, expense_id, user_id),
+        )
+        conn.execute(
+            "INSERT INTO expense_edits (expense_id, edited_at, old_amount, new_amount, "
+            "old_category, new_category, old_date, new_date, old_description, new_description) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (expense_id, now, old["amount"], amount, old["category"], category,
+             old["date"], date, old["description"], description),
         )
         conn.commit()
-        return cur.rowcount == 1
+        return True
+    finally:
+        conn.close()
+
+
+def get_expense_edits(user_id, expense_ids):
+    """Edit history for the given expenses (only the user's own), newest first."""
+    if not expense_ids:
+        return []
+    conn = get_db()
+    try:
+        # The id list travels as one JSON parameter, so the SQL text stays fixed.
+        return conn.execute(
+            "SELECT expense_edits.* FROM expense_edits "
+            "JOIN expenses ON expenses.id = expense_edits.expense_id "
+            "WHERE expenses.user_id = ? "
+            "AND expense_edits.expense_id IN (SELECT value FROM json_each(?)) "
+            "ORDER BY expense_edits.edited_at DESC, expense_edits.id DESC",
+            (user_id, json.dumps(list(expense_ids))),
+        ).fetchall()
     finally:
         conn.close()
 

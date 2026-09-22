@@ -37,8 +37,8 @@ This step makes editing an expense a real feature:
    time is stored. The user lands back on `/profile` with the **same date
    filter** they were viewing, an "Expense updated." toast, and the edited
    row highlighted.
-4. Rows that have ever been edited show a small **edited** tag in Recent
-   Transactions.
+4. Rows that have ever been edited show a small yellow circle badge (with a pencil) in front
+   of the date in Recent Transactions.
 
 ## 2. Functional Requirements
 
@@ -79,10 +79,23 @@ This step makes editing an expense a real feature:
   `.row-delete-btn` (same padding, radius and muted colour), but its hover
   uses `--accent`/`--accent-light` (or the nearest existing accent tokens)
   instead of the danger colours.
-- **FR6 — "edited" tag.** In the Description cell, when
-  `expense.updated_at` is set, a `<span class="edited-tag">edited</span>`
-  follows the description text (or the `—`). It's small, in muted ink,
-  styled with tokens only. Rows never edited show no tag.
+- **FR6 — Edited badge.** When `expense.updated_at` is set, the Date cell
+  starts with a `<button type="button" class="edited-badge">` holding
+  `icons.edit(10)` (a small dark `--ink` pencil) inside a filled yellow
+  (`--sticky`) circle, so it can't be mistaken for the row's plain pencil
+  edit button. It sits in a gutter on the left of the Date column. Every row
+  and the header keep that gutter, so the dates stay lined up and the
+  description column isn't narrowed. Rows never edited show no badge.
+  - **Instant tooltip:** hovering (or keyboard-focusing) the badge shows,
+    with no delay, a small dark tooltip `Edited <D Mon YYYY, h:mm AM/PM> ·
+    click for history`, drawn with CSS (`data-tooltip` + `::after`), not the
+    browser's delayed `title` tooltip.
+  - `aria-label="Edited <same time>, show edit history"`.
+  - Clicking it opens the edit-history popup (FR22).
+  - *(Changed 2026-09-23 at the developer's request: first an "edited" text
+    tag, which the Description column's "…" cut off; then a plain pencil,
+    which looked like the edit button; then a `title` tooltip, which
+    appeared only after a delay.)*
 - **FR7 — Nothing else changes on the page.** Other cards, the delete
   popup, the empty states and the Step 7 green new-row highlight stay as
   they are.
@@ -161,7 +174,7 @@ This step makes editing an expense a real feature:
 ### After saving — `/profile`
 
 - **FR18 — Page reflects the edit.** The row shows the new values and the
-  **edited** tag. The stat tiles, By Category, the range+budget bar and the
+  edited badge. The stat tiles, By Category, the range+budget bar and the
   monthly budget table all use the new values (they query the DB on every
   load). If the new date is outside the current filter, the row isn't
   shown. The toast still appears.
@@ -187,6 +200,65 @@ This step makes editing an expense a real feature:
   the old edit form. A normal click on the pencil, or a refresh, is
   unaffected.
 
+### Edit history (added 2026-09-23, developer request)
+
+- **FR21 — History table.** A new table, created in `init_db()` with
+  `CREATE TABLE IF NOT EXISTS`:
+  ```sql
+  expense_edits (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      expense_id INTEGER NOT NULL,
+      edited_at TEXT NOT NULL,          -- UTC, same value as expenses.updated_at
+      old_amount REAL NOT NULL,   new_amount REAL NOT NULL,
+      old_category TEXT NOT NULL, new_category TEXT NOT NULL,
+      old_date TEXT NOT NULL,     new_date TEXT NOT NULL,
+      old_description TEXT,       new_description TEXT,
+      FOREIGN KEY (expense_id) REFERENCES expenses(id) ON DELETE CASCADE
+  )
+  ```
+  - `update_expense()` records one row per successful edit, **in the same
+    transaction** as the `UPDATE`: it reads the old values first (still
+    scoped by `id = ? AND user_id = ?`), updates the expense, then inserts
+    the old and new values. `expenses.updated_at` and `edited_at` get the
+    same timestamp. A "No changes to save." submit writes nothing (FR16),
+    so it adds no history.
+  - Deleting an expense (Step 9) deletes its history too (`ON DELETE
+    CASCADE`; `get_db()` already turns foreign keys on).
+- **FR22 — History popup.** Clicking an edited badge opens
+  `#edit-history-modal`, one shared popup built like the other popups
+  (`.modal` + `.modal-overlay[data-modal-close]` + `.modal-content` with a
+  `×` `.modal-close`, the same `.opening` animation). It's only rendered
+  when at least one shown row has history. Top to bottom:
+  1. Heading `h2` **Edit history**.
+  2. The expense as it is now: `<date> · <category> · ₹<amount> ·
+     <description or —>`.
+  3. One entry per edit, **newest first**. Each entry shows when it
+     happened (`D Mon YYYY, h:mm AM/PM`, converted from UTC to the
+     computer's local time), then **only the fields that changed** in that
+     edit, one line each, `<Field>: <old> → <new>`. The old value is struck
+     through. Fields are labelled Amount (`₹` + `inr`), Category, Date
+     (`YYYY-MM-DD`) and Description (`—` when empty), in that order.
+  - Closes with ×, a click on the overlay, or a **Close** button.
+- **FR23 — Where the data comes from.** `/profile` loads the history for
+  just the rows it shows (at most 5), with one new query
+  `get_expense_edits(user_id, expense_ids)` (it joins `expenses` so only
+  the signed-in user's history is returned). Each edited row's entries
+  are rendered server-side into a `<template id="edit-history-<id>">`. The
+  JS copies that template into the popup, so there's no extra request
+  and no `innerHTML` with user text (Jinja autoescapes it).
+- **FR24 — JS.** A new IIFE in `static/js/main.js`
+  (`// Profile: edit-history popup, opened from each row's edited badge`),
+  starting with `if (!modal) return;`. It opens the popup with the matching
+  template's content and closes it via `[data-modal-close]`.
+- **FR25 — Edits made before history existed.** Rows edited before this
+  table existed have an `updated_at` but no history. On startup,
+  `init_db()` runs
+  `UPDATE expenses SET updated_at = NULL WHERE updated_at IS NOT NULL AND
+  id NOT IN (SELECT expense_id FROM expense_edits)`, so those rows lose
+  their badge (and show "Never edited" on the edit page). The developer
+  chose this over keeping a badge with no history behind it. After the
+  first run it changes nothing, because every later edit writes history.
+
 ## 3. APIs
 
 | Route | Method | Input | Output |
@@ -200,7 +272,8 @@ This step makes editing an expense a real feature:
 
 ```python
 def get_expense(user_id, expense_id)            # -> sqlite3.Row | None
-def update_expense(user_id, expense_id, amount, category, date, description)  # -> bool
+def update_expense(user_id, expense_id, amount, category, date, description)  # -> bool; also writes expense_edits
+def get_expense_edits(user_id, expense_ids)    # -> list of expense_edits rows, newest first
 ```
 
 **Schema change:** `expenses.updated_at TEXT` (nullable, UTC
@@ -213,13 +286,13 @@ def update_expense(user_id, expense_id, amount, category, date, description)  # 
 
 | File | Change |
 |---|---|
-| `database/db.py` | `updated_at` in `CREATE TABLE expenses` + idempotent `ALTER TABLE` in `init_db()`; new `get_expense()`, `update_expense()` |
-| `app.py` | `edit_expense(id)` route: stub → `GET`/`POST`, login check, 404, validation (share Step 7's parsing/validation with `add_expense` rather than copy it, e.g. a small helper in `app.py`), no-change check, update, flash, redirect. `add_expense` keeps the same behaviour |
+| `database/db.py` | `updated_at` in `CREATE TABLE expenses` + idempotent `ALTER TABLE` in `init_db()`; new `expense_edits` table + the FR25 cleanup; new `get_expense()`, `update_expense()` (writes history), `get_expense_edits()` |
+| `app.py` | `profile()` passes each shown row's edit history (FR23), with a helper that turns an `expense_edits` row into its changed-field lines and a local-time formatter. `edit_expense(id)` route: stub → `GET`/`POST`, login check, 404, validation (share Step 7's parsing/validation with `add_expense` rather than copy it, e.g. a small helper in `app.py`), no-change check, update, flash, redirect. `add_expense` keeps the same behaviour |
 | `templates/add_expense.html` | Made to serve both pages: title, subtitle, form action and submit label come from the route; the original-values line, edited-on line and filter hidden inputs render only on the edit page; Cancel link uses the filter on edit |
-| `templates/profile.html` | Pencil `<a class="row-edit-btn">` before each trash button; `edited` tag in the Description cell |
-| `static/css/profile.css` | Wider Actions column, `.row-edit-btn`, `.edited-tag` (tokens only) |
+| `templates/profile.html` | Pencil `<a class="row-edit-btn">` before each trash button; edited badge button in the Date cell; `#edit-history-modal` + one `<template>` per edited row |
+| `static/css/profile.css` | Wider Actions column, `.row-edit-btn`, Date-column gutter + `.edited-badge` (tokens only) |
 | `static/css/add_expense.css` | Styles for the original-values and edited-on lines, if needed (tokens only) |
-| `static/js/main.js` | New IIFE: on Back/Forward arrival at the edit page, `location.replace` to the profile row (FR20) |
+| `static/js/main.js` | New IIFE: on Back/Forward arrival at the edit page, `location.replace` to the profile row (FR20). New IIFE: edit-history popup (FR24) |
 | `.claude/PROGRESS.md` | (At Git finish) route row `GET /expenses/<id>/edit — Stub — Step 8` → `GET/POST /expenses/<id>/edit — Implemented — Step 8` |
 
 ## 5. Constraints
@@ -250,7 +323,11 @@ def update_expense(user_id, expense_id, amount, category, date, description)  # 
   FR20.
 - The same Back-arrow behaviour for the Add expense page (Step 7). Not
   requested; it would need its own change.
-- Edit history / audit log (only the latest `updated_at` is kept), and undo.
+- Undo, or restoring a previous version from the history popup (the popup
+  is read-only).
+- History for expenses not shown in Recent Transactions (no full list yet).
+- Recovering history for edits made before the `expense_edits` table
+  existed (FR25 clears their badge instead).
 - Showing the full edited time (hours/minutes) or converting it to local
   time. The date part is shown as stored (UTC). See Edge Cases.
 - Bulk edit.
@@ -272,11 +349,14 @@ def update_expense(user_id, expense_id, amount, category, date, description)  # 
 | Save with nothing changed | No write, `updated_at` unchanged, toast `No changes to save.` (FR16) |
 | Only whitespace added to the description | Treated as unchanged (stripped before comparing) |
 | Amount `250` vs stored `250.0` | Treated as unchanged (compared as numbers after rounding) |
-| Clearing the description | Stored as `NULL`; the row shows `—` plus the `edited` tag |
+| Clearing the description | Stored as `NULL`; the row shows `—` and the edited badge |
 | New date outside the current filter | Saved; the row isn't on the page it redirects to; the toast still shows (FR18) |
 | Opened by typed URL with no filter args | Cancel and Save go to plain `/profile` |
 | Bad `range`/`start`/`end` values | Passed through unchanged; `/profile`'s existing filter handling shows its own message |
-| Old `database.db` without `updated_at` | Column added on startup; all old rows show `Never edited` and no tag |
+| Old `database.db` without `updated_at` | Column added on startup; all old rows show `Never edited` and no badge |
+| Delete an edited expense | Its `expense_edits` rows are deleted too (FR21) |
+| An edit saved twice with the same values | The second is "No changes to save.", so it adds no history entry |
+| History entry where only the description was cleared | One line: `Description: <old> → —` |
 | `updated_at` is UTC | Between 00:00 and 05:30 IST the "Last edited" date shows the previous day. This is the same known UTC-vs-local issue already listed in PROGRESS.md; it's not fixed here |
 | Description with HTML like `<b>x</b>` | Shown as literal text on the edit page and in the table (autoescape) |
 
@@ -288,7 +368,7 @@ def update_expense(user_id, expense_id, amount, category, date, description)  # 
 - [ ] **AC4** — Signed in, `GET /expenses/<own id>/edit` returns **200** with the title **Edit expense**, the budget line, `Currently: <date> · <category> · ₹<amount> · <description or —>`, `Never edited` for a never-edited expense, the 4 fields pre-filled with the stored values, a **Save changes** button and a **Cancel** link.
 - [ ] **AC5** — The edit form posts to `/expenses/<id>/edit` and carries the `range`/`start`/`end` from the page's query string as hidden inputs. Cancel's `href` is `/profile` with the same args plus `#expense-<id>`.
 - [ ] **AC6** — Valid changed POST → **302**, `Location` `/profile?<the range/start/end sent>#expense-<id>`; the next page shows the toast **Expense updated.**; the DB row has the new amount/category/date/description and a non-NULL `updated_at`; that row has `class="row-new"` on the page it redirects to.
-- [ ] **AC7** — After an edit, that row shows an `edited` tag (`span.edited-tag`), and never-edited rows don't.
+- [ ] **AC7** — After an edit, that row's Date cell starts with a `button.edited-badge` (dark pencil in a yellow circle), and never-edited rows have none. Hovering it shows the tooltip `Edited <D Mon YYYY, h:mm AM/PM> · click for history` immediately. Dates in all rows stay lined up, and the Description column shows as much text as before this step.
 - [ ] **AC8** — After an edit, the edit page shows `Last edited <YYYY-MM-DD>` in place of `Never edited`.
 - [ ] **AC9** — POST with values identical to the stored ones → **302** to `/profile?<filter>#expense-<id>`, toast **No changes to save.**, and `updated_at` unchanged (still `NULL` if never edited).
 - [ ] **AC10** — Each of the 7 invalid inputs returns **200** with its exact Step 7 message, keeps the typed values, and leaves the DB row unchanged.
@@ -299,6 +379,11 @@ def update_expense(user_id, expense_id, amount, category, date, description)  # 
 - [ ] **AC15** — `/expenses/add` still shows **Add an expense**, button **Add expense**, posts to `/expenses/add`, and shows no `Currently:` / `Never edited` lines. Adding an expense still works as in Step 7.
 - [ ] **AC16** — A description `<b>x</b>` shows as literal text in the `Currently:` line and in the table.
 - [ ] **AC17** — Every Recent Transactions row has `id="expense-<id>"`. After a successful save (or a no-changes save), the redirect `Location` ends with `#expense-<id>`, and the browser shows that row in view, below the navbar.
+- [ ] **AC19** — Each successful edit adds exactly one `expense_edits` row with the old and new values and `edited_at` equal to the expense's `updated_at`. A "No changes to save." submit adds none.
+- [ ] **AC20** — Clicking an edited badge opens **Edit history** showing that expense's current values and one entry per edit, newest first, each listing only the changed fields as `<Field>: <old> → <new>`, with the old value struck through. ×, the overlay and **Close** each close it.
+- [ ] **AC21** — Deleting an edited expense also deletes its `expense_edits` rows.
+- [ ] **AC22** — After startup, no expense has `updated_at` set without at least one `expense_edits` row (FR25), and those rows show no badge.
+- [ ] **AC23** — A description like `<b>x</b>` in a history entry shows as literal text.
 - [ ] **AC18** — After saving an edit, pressing the browser's Back arrow shows `/profile` (with the same filter, scrolled to that row), not the edit form. The same happens after Cancel → Back. Clicking a pencil normally still opens the edit page.
 
 ## 9. Manual Verification Guide
@@ -364,8 +449,10 @@ Expected: two lines like `61|250.0|Food|2026-09-23|Lunch|` and
 3. Second terminal: re-run the Setup query. The Lunch line is now like `61|300.0|Transport|2026-09-23|Cab|2026-09-23 10:15:02`, and `updated_at` is filled in.
 4. The 302: DevTools → **Network** → tick **Preserve log** → edit again (e.g. amount `310`) → click the request named `edit` → **Status Code: 302 FOUND**, `Location: /profile?range=this_month#expense-61`.
 
-**AC7 — edited tag.**
-1. On `/profile`: the Cab row shows a small `edited` label after `Cab`. The `<b>x</b>` row has none.
+**AC7 — edited badge.**
+1. On `/profile`: the Cab row has a small yellow circle with a dark pencil inside, just left of its date. It looks clearly different from the plain pencil edit button on the right. The `<b>x</b>` row has none, and both dates line up in the same column.
+2. Move the mouse onto the yellow circle: a small dark tooltip appears **straight away** reading `Edited 23 Sep 2026, 3:45 PM · click for history` (your time).
+3. Give the Cab row a long description (e.g. `Sample Entertainment expense for the whole team outing`) and save. Expected: the badge is still fully visible by the date. The description gets cut off with `…` as usual.
 
 **AC8 — last edited date.**
 1. Click the Cab row's pencil. Expected: `Last edited 2026-09-23` in place of `Never edited`. (Between 00:00 and 05:30 IST it may show yesterday's date. That's the known UTC issue from §7.)
@@ -375,7 +462,7 @@ Expected: two lines like `61|250.0|Food|2026-09-23|Lunch|` and
 2. On its edit page click **Save changes** without changing anything.
 3. Expected: back on `/profile`, toast **No changes to save.**, no green highlight.
 4. Re-run the Setup query: `updated_at` is exactly the same as before.
-5. Repeat on the `<b>x</b>` row: after saving, its `updated_at` is still empty and it has no `edited` tag.
+5. Repeat on the `<b>x</b>` row: after saving, its `updated_at` is still empty and it has no edited badge.
 
 **AC10 — validation.** On the Cab row's edit page, try each of these and click **Save changes**. Each shows the red message above the form, keeps what you typed, and changes nothing in the DB (re-run the Setup query after):
 
@@ -422,6 +509,28 @@ Expected: two lines like `61|250.0|Food|2026-09-23|Lunch|` and
 3. Expected: `/profile` opens already scrolled down, with the Cab row visible *below* the navbar (not hidden under it) and flashing green. The address bar ends in `#expense-61`.
 4. Right-click the row → **Inspect**: the `<tr>` has `id="expense-61"`.
 
+**AC19 — one history row per edit.**
+1. Second terminal: `sqlite3 database.db "SELECT expense_id, edited_at, old_amount, new_amount, old_category, new_category FROM expense_edits WHERE expense_id = 61;"`
+2. Expected: one line per real edit you made to Cab, e.g. `61|2026-09-23 10:15:02|250.0|300.0|Food|Transport`. Its `edited_at` matches the Cab row's `updated_at` from the Setup query.
+3. Save the Cab edit page once with no changes, then re-run step 1: still the same number of lines.
+
+**AC20 — history popup.**
+1. On `/profile`, click the Cab row's yellow badge.
+2. Expected: a popup **Edit history**, the Cab row's current values, then the edits newest first. Your first edit reads something like `Amount: ~~₹250.00~~ → ₹300.00`, `Category: ~~Food~~ → Transport`, `Description: ~~Lunch~~ → Cab`. A later amount-only edit shows just the Amount line.
+3. Close it with ×, then reopen and click outside the box, then reopen and click **Close**. Each one closes it.
+
+**AC21 — delete removes history.**
+1. Edit the `<b>x</b>` row once (amount `41`), then delete it with its trash icon.
+2. `sqlite3 database.db "SELECT COUNT(*) FROM expense_edits WHERE expense_id = 62;"` → `0`.
+
+**AC22 — old badges without history cleared.**
+1. `sqlite3 database.db "SELECT COUNT(*) FROM expenses WHERE updated_at IS NOT NULL AND id NOT IN (SELECT expense_id FROM expense_edits);"` → `0`.
+2. Rows edited before this change (e.g. the sample rows 40, 41, 43) show no badge, and their edit page says `Never edited`.
+
+**AC23 — HTML in history shown as text.** *(do this before AC21)*
+1. Change the `<b>x</b>` row's description to `plain`, save, and click its badge.
+2. Expected: `Description: <b>x</b> → plain`, with `<b>x</b>` shown as characters, not bold.
+
 **AC18 — Back arrow skips the old edit form.**
 1. On `/profile`, click the Cab row's pencil, change the amount, click **Save changes**.
 2. Click the browser's **Back** arrow (←) once.
@@ -448,7 +557,7 @@ the throwaway test DB, never `database.db`:
    `Edit expense`, `Never edited`, `Save changes`, the stored values.
 2. `POST` changed values with `range=last_3_months` → 302, `Location` ends
    with `/profile?range=last_3_months#expense-<id>`; following it shows `Expense updated.`,
-   `edited-tag`, and `row-new`; DB row updated, `updated_at` not NULL.
+   `edited-badge`, and `row-new`; DB row updated, `updated_at` not NULL.
 3. `POST` identical values → 302, `No changes to save.`, `updated_at`
    unchanged.
 4. Each of the 7 invalid inputs → 200 + exact message, DB unchanged.
@@ -460,6 +569,11 @@ the throwaway test DB, never `database.db`:
    `?range=this_month`. (The Back-arrow redirect itself is browser behaviour,
    so AC18 is checked by hand.)
 7. `/expenses/add` still shows `Add an expense` and no `Never edited`.
+7b. Two edits of one expense → two `expense_edits` rows with the right old/new
+    values; `/profile` contains `class="edited-badge"`,
+    `id="edit-history-modal"` and `<template id="edit-history-<id>">` with
+    `Amount`; a no-changes save adds no row; deleting the expense removes its
+    rows; `init_db()` clears `updated_at` on a row with no history.
 8. `init_db()` on a DB created with the old `expenses` schema (without
    `updated_at`) adds the column and keeps existing rows.
 

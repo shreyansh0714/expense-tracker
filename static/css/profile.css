@@ -322,17 +322,108 @@
 
 .row-delete-btn:hover { color: var(--danger); background: var(--danger-light); }
 
-/* --- Edit expense: pencil link, "edited" tag (Step 8) --- */
+/* --- Edit expense: pencil link, edited badge (Step 8) --- */
 /* Edit redirects to #expense-<id>; keep the row clear of the sticky navbar. */
 .transactions-table tr { scroll-margin-top: 6rem; }
 
 .row-edit-btn:hover { color: var(--accent); background: var(--accent-light); }
 
-.edited-tag {
-    font-size: 0.75rem;
-    font-style: italic;
+/* Edited rows get a yellow circle badge in a gutter left of the date. Every
+   row (and the header) keeps the gutter, so the dates stay lined up. Filled
+   yellow so it can't be mistaken for the plain row-edit pencil button. */
+.transactions-table th:first-child,
+.transactions-table td:first-child { padding-left: 1.6rem; }
+.transactions-table td:first-child { position: relative; }
+
+.edited-badge {
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.2rem;
+    height: 1.2rem;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: var(--sticky);
+    color: var(--ink);
+    cursor: pointer;
+}
+
+.edited-badge:hover,
+.edited-badge:focus-visible {
+    outline: 2px solid var(--accent-2);
+    outline-offset: 1px;
+}
+
+/* Instant tooltip: the browser's own title tooltip only shows after a delay. */
+.edited-badge::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    left: 0;
+    bottom: calc(100% + 0.4rem);
+    z-index: 5;
+    padding: 0.3rem 0.55rem;
+    border-radius: var(--radius-sm);
+    background: var(--ink);
+    color: var(--paper-card);
+    font-family: var(--font-body);
+    font-size: 0.72rem;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.edited-badge:hover::after,
+.edited-badge:focus-visible::after { opacity: 1; }
+
+/* --- Edit history popup (Step 8) --- */
+.edit-history-current {
+    margin: 0.5rem 0 1rem;
+    font-size: 0.85rem;
+    color: var(--ink-muted);
+    overflow-wrap: anywhere;
+}
+
+.edit-history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    max-height: 50vh;
+    margin: 0;
+    padding: 0;
+    overflow-y: auto;
+    list-style: none;
+}
+
+.edit-history-entry {
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border-soft);
+}
+
+.edit-history-entry:last-child { padding-bottom: 0; border-bottom: none; }
+
+.edit-history-when {
+    margin-bottom: 0.3rem;
+    font-size: 0.8rem;
     color: var(--ink-muted);
 }
+
+.edit-history-changes {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 0.9rem;
+    color: var(--ink);
+    overflow-wrap: anywhere;
+}
+
+.edit-history-field { color: var(--ink-muted); }
+.edit-history-changes del { color: var(--ink-muted); }
+.edit-history-changes ins { text-decoration: none; }
 
 .delete-expense-details {
     display: grid;

@@ -135,6 +135,43 @@
     });
 })();
 
+// Profile: edit-history popup, opened from each row's edited badge
+(function () {
+    var modal = document.getElementById("edit-history-modal");
+    if (!modal) return;
+
+    var body = modal.querySelector("[data-history-body]");
+    var content = modal.querySelector(".modal-content");
+    var ANIMATION_MS = 420;
+
+    function openModal(btn) {
+        // The history is already rendered (and escaped) by Jinja in a <template>.
+        var template = document.getElementById(btn.dataset.history);
+        if (!template) return;
+        body.replaceChildren(template.content.cloneNode(true));
+        modal.hidden = false;
+        content.classList.remove("opening");
+        void content.offsetWidth; // force reflow so the animation replays every open
+        content.classList.add("opening");
+        setTimeout(function () {
+            content.classList.remove("opening");
+        }, ANIMATION_MS);
+    }
+
+    function closeModal() {
+        modal.hidden = true;
+    }
+
+    document.querySelectorAll(".edited-badge").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+            openModal(btn);
+        });
+    });
+    modal.querySelectorAll("[data-modal-close]").forEach(function (el) {
+        el.addEventListener("click", closeModal);
+    });
+})();
+
 // Edit expense: arriving here via the browser's Back/Forward means this edit
 // was already saved or cancelled, so swap the stale form for the profile row.
 (function () {
