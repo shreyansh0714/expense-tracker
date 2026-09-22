@@ -135,6 +135,20 @@
     });
 })();
 
+// Edit expense: arriving here via the browser's Back/Forward means this edit
+// was already saved or cancelled, so swap the stale form for the profile row.
+(function () {
+    var form = document.getElementById("edit-expense-form");
+    if (!form) return;
+
+    window.addEventListener("pageshow", function (event) {
+        var nav = performance.getEntriesByType("navigation")[0];
+        if (event.persisted || (nav && nav.type === "back_forward")) {
+            location.replace(form.dataset.backTo);
+        }
+    });
+})();
+
 // Profile: verification-code popup for email changes
 (function () {
     var form = document.getElementById("profile-form");

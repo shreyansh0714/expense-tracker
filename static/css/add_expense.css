@@ -27,3 +27,13 @@
 }
 
 .expense-cancel:hover { color: var(--ink); }
+
+/* --- Edit expense: original values + last edited (Step 8) --- */
+.expense-original,
+.expense-edited {
+    font-size: 0.85rem;
+    color: var(--ink-muted);
+    overflow-wrap: anywhere;
+}
+
+.expense-edited { margin-bottom: 1.25rem; }
