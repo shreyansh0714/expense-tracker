@@ -124,46 +124,23 @@ Never write "X lives in file Y" without that `grep` passing.
   pass covers what has to be seen. Revisit once Playwright gives an agent
   a real browser.
 
-## Learning notes artifact
+## Personal working preferences
 
-The developer is building this project as a learning exercise and keeps a
-living reference doc, **Spendly Field Notes**, for backend/Python/Flask
-concepts they're new to (explained through what they already know —
-React, Redux, JS, HTML/CSS, Git):
-
-https://claude.ai/artifact/6vjCPWhWYkaTTQqTYzvqu3
-
-- **Update it in place** (same URL) as the project grows or as new doubts
-  come up in a session — don't create a new artifact. Read it first
-  (`Artifact` action `read`), then republish with `url:` set to the link
-  above, following the section template already established in the doc
-  (prerequisite flag → why → analogy-first what → one concrete Spendly
-  example → how it works → good practices → when to use/not → where
-  else it shows up). Section 0 (project map) should get redrawn whenever
-  a row in the "Routes — implemented vs stub" table in `.claude/PROGRESS.md`
-  actually changes.
-- **Before re-explaining something from scratch in chat, check whether
-  the artifact already covers it.** If it does, point the developer to
-  that artifact section instead of retyping the explanation — the
-  artifact is the durable copy; chat explanations aren't. Only add fresh
-  chat explanation for something genuinely new, then fold it into the
-  artifact per the update rule above.
-- See the `spendly-beginner-teaching-style` memory file for the exact
-  explanation pattern to follow, and `../prompt.md` (one level up, next
-  to this project folder) for the full reusable process this artifact
-  was built from.
+Communication preferences (how explanations and status reports are
+formatted, the plain-brief keyword, the learning-notes artifact) live in
+`CLAUDE.local.md`. That file is personal, not committed, and Claude Code
+loads it automatically alongside this one.
 
 ## Spec verification convention
 
-- The developer driving this project is a beginner and does not yet know how
-  to verify acceptance criteria independently (e.g. reading a session
-  cookie in DevTools, running a `curl`/`pytest` check, reading a server
-  log). Every spec written by `/create-spec` must therefore include a
-  **Manual Verification Guide** section directly below **Acceptance
-  Criteria** — explicit, beginner-friendly, step-by-step instructions
-  (exact UI paths, exact commands, exact expected output) for verifying
-  *each* acceptance-criteria item by hand. See
-  `.claude/commands/create-spec.md` for the section this produces.
+- Every spec written by `/create-spec` must include a **Manual
+  Verification Guide** section directly below **Acceptance Criteria**:
+  explicit step-by-step instructions (exact UI paths, exact commands,
+  exact expected output) for verifying *each* acceptance-criteria item by
+  hand, written so someone new to the stack can follow them (e.g. how to
+  read a session cookie in DevTools, run a `curl`/`pytest` check, or read
+  a server log). See `.claude/commands/create-spec.md` for the section
+  this produces.
 - The Manual Verification Guide is the "Validate" step of the SDD workflow
   below; `/test-feature` and `/code-review-feature` run after it.
 
@@ -193,83 +170,6 @@ https://claude.ai/artifact/6vjCPWhWYkaTTQqTYzvqu3
   caption and its two "Pinned" process-note stickies were nearly mistaken
   for real requirements on the Step 4 (Profile page) spec.
 
-## Explanation & document clarity convention
-
-- Never explain a decision, a gap, or "what changed" using a bare pointer
-  like "this gap," "that issue," or "the problem above" and assume the
-  reader already holds the reference in mind. Always restate, in plain
-  words, exactly what's being pointed at — quote the actual source
-  text/file/line where one exists.
-- When the answer to a question is a set of yes/no or status items (e.g.
-  "are these implemented?", "what changed?"), answer with a table —
-  item → status → one-line reason — not a paragraph the reader has to
-  parse to extract the answer.
-- This applies everywhere the developer has to read and understand
-  something Claude produced: chat replies, **and every section of a spec
-  or plan** — not just the Manual Verification Guide, which already had
-  to be this concrete by its own convention above.
-
-  **Bad** (a real line from this project's history, flagged by the
-  developer as unclear): *"That's a real gap — want me to add it now?"*
-  — vague pointer, no restated reference, forces the reader to scroll back
-  and guess which gap.
-
-  **Good** (the corrected version the developer confirmed worked):
-  *"Two mockup captions were fake demo text, not real features: 'auto-
-  calculated from last 3 months' under the budget field, and the two
-  'Pinned' stickies ('Beautify only — CSS + markup polish...', 'Read the
-  spec first. Style second.'). Nothing today stops a future page-polish
-  pass from copying that text onto a real page. Want me to add a rule
-  preventing that — yes or no?"* — names the exact text, states the
-  concrete risk in one sentence, ends with one direct question.
-
-  **Bad** (status question answered as prose): *"Most of what you asked
-  about is implemented — notes and the spend summary are done, though the
-  transaction history part is more of a preview than a full history since
-  that got scoped down earlier."*
-
-  **Good** (same content, as a table):
-
-  | Item | Implemented? |
-  |---|---|
-  | Personal notes section | Yes |
-  | Monthly total spend | Yes |
-  | Category breakdown | Yes |
-  | Full transaction history | No — scoped down to a 5-item preview earlier |
-
-- **Why:** added 2026-09-16 after the developer said, verbatim: "explain
-  in simple and plain terms and also dont talk without any reference and
-  assuming i will catch it." The corrected explanation (quoted text +
-  concrete risk + single question) got the reply "this explanation was
-  good and i was able to understand" — that's the calibrated bar for
-  every explanation and every spec/plan section from here on, not just
-  the one that prompted this rule.
-
-## plain-brief keyword
-
-- When the developer types `/plain-brief` **or just writes "plain-brief"
-  in chat**, re-explain the latest report/status (or the named topic) in
-  the plain-brief format. Full definition + Bad/Good example:
-  `.claude/commands/plain-brief.md`. The 5 parts:
-  1. **Where we are** — the feature in plain words, the SDD step, what
-     just ran and why.
-  2. **Who's who** — one plain line for every function, file, subagent,
-     AC/FR number named.
-  3. **Before/after** — what the spec requires (quoted), what the code
-     did, what the user would actually see.
-  4. **Status table** — item → status → one-line reason.
-  5. **One direct question** at the end.
-- Use this format by default for any report that follows long or
-  background work (test runs, reviews, multi-agent tasks), even without
-  the keyword.
-- **Why:** added 2026-09-19. After a long run of subagent work, a
-  code-review report named `resolve_date_range`, `format_day`, reviewer
-  subagents and AC numbers with no reminder of what any of them were.
-  The developer, verbatim: "its like running an organization and as a
-  owner or boss , i cant remember every function and every single peice
-  of code and there reference ... you just made me frustated." The
-  corrected briefing followed the 5 parts above.
-
 ## Session scope convention
 
 - Don't bundle a whole page's worth of work into one uninterrupted
@@ -279,12 +179,10 @@ https://claude.ai/artifact/6vjCPWhWYkaTTQqTYzvqu3
 - **Why:** the Step 4 (Profile page) implementation tried to do the
   two-column layout, every piece of read-only content (member-since,
   budget-vs-spent, category breakdown, recent activity, notes), *and* the
-  full `spendly-ui-polish` visual treatment in one session. Result,
-  confirmed by the developer directly on 2026-09-16: "the profile page ui
-  is missing lots of things that we have decided and also the data is not
-  rendered correctly on the page rn." Their own stated lesson: "never
-  implement too many features all together in one session." See the
-  Future Tasks entry below for the actual cleanup this now needs.
+  full `spendly-ui-polish` visual treatment in one session. On 2026-09-16
+  the developer's review found the page missing several agreed elements
+  and rendering some data incorrectly. Lesson: never implement too many
+  features together in one session.
 - **How to apply:** when a plan's Tasks checklist has several
   independent-ish pieces (e.g. structure, then content A, then content B,
   then visual polish), stop and show the developer what's built after
@@ -388,7 +286,7 @@ workflow uses them:
 | `/code-review-feature <spec-name>` | Parallel security + quality review of `git diff main` and new files, one unified verdict |
 | `/seed-user`, `/seed-expense` | Add dummy data to `database.db` for manual testing |
 | `/explorer` | Start-of-session orientation: launches the `explorer` subagent and shows its briefing |
-| `/plain-brief [topic]` | Re-explains the latest report (or a topic) in the plain-brief format (see "plain-brief keyword" above) |
+| `/plain-brief [topic]` | Re-explains the latest report (or a topic) in the plain-brief format (full definition in `.claude/commands/plain-brief.md`) |
 
 ### Deployment
 

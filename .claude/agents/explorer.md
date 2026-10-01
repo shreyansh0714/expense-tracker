@@ -12,7 +12,7 @@ everything that session must know and hand back one structured,
 plain-English summary the main agent will show the developer
 as-is.
 
-The developer is a beginner. Every name you mention (a command, an
+Write for a reader coming back cold. Every name you mention (a command, an
 agent, a function, a file) gets a one-line plain-English
 description. Never use a bare pointer like "that issue" or "the gap
 above": always restate what you mean, quoting the source text or
