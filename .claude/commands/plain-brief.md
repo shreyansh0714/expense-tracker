@@ -6,13 +6,11 @@ argument-hint: "[optional topic]"
 <!--
   plain-brief.md — Spendly.
 
-  Why this file exists: the developer is a beginner who often switches
+  Why this file exists: the developer often switches
   away from a long Claude session and comes back to status reports full
   of function names, subagent names and AC/FR numbers with no context.
-  Their own comparison: it's like a boss walking into the office and
-  being told "person X reported this about that, which resulted in that,
-  I need approval for Z" — every word is technically true, none of it
-  lands, because the listener wasn't in the room.
+  Every word of such a report can be technically true and still not
+  land, because the reader wasn't in the room when those names came up.
 
   "plain-brief" is the format the developer approved to fix that. It
   runs when they type `/plain-brief` (optionally with a topic), or when

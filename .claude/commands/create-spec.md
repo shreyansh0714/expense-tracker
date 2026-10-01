@@ -205,9 +205,8 @@ placeholders:
 6. **Out of Scope** — what this feature explicitly will NOT do.
 7. **Edge Cases and Error Handling** — failure modes and how they're handled.
 8. **Acceptance Criteria** — checklist for when this is considered done.
-9. **Manual Verification Guide** — the developer driving this project is a
-   beginner and does not yet know how to verify acceptance criteria on
-   their own. For *every* item in section 8, write explicit, beginner-safe,
+9. **Manual Verification Guide** — written for someone new to the stack. For
+   *every* item in section 8, write explicit, beginner-safe,
    step-by-step instructions for checking it by hand: exact UI paths (e.g.
    "DevTools → Application tab → Storage → Cookies → pick the origin
    matching your URL bar exactly"), exact commands to run (`curl`, `pytest`,
@@ -225,8 +224,8 @@ Verification) were added after checking the official Claude Code docs —
 each closes a real gap the other 6 leave open (which files actually
 change, what's deliberately excluded, and how anyone proves it worked).
 Section 9 (Manual Verification Guide) was added later still, specifically
-because the developer here can't yet verify acceptance criteria
-unassisted — see CLAUDE.md's "Spec verification convention".
+so every acceptance criterion can be checked by hand without prior
+knowledge of the stack — see CLAUDE.md's "Spec verification convention".
 
 ## Step 10 — Report back
 

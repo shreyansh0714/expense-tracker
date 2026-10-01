@@ -5,3 +5,7 @@ __pycache__/
 *.pyo
 .env
 .DS_Store
+
+# Personal / local-only files
+CLAUDE.local.md
+.claude/plans/10-11-readme-roadmap.md
