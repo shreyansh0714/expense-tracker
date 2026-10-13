@@ -29,6 +29,10 @@ You write tests based on **feature specifications and expected behavior**, never
 ## Fixture Strategy
 Use the fixtures in `tests/conftest.py` — `client` (a fake browser on an empty throwaway database) and `auth_client` (the same, already registered and logged in as `test@example.com`). Do NOT define your own `app`, `client` or `auth_client`, and never touch the real `database.db`. If a test needs more setup, build it through the routes (e.g. POST to `/register`) using what the spec says.
 
+**Every POST must carry a CSRF token.** Use `csrf_post(client, url, data=...)`, imported with `from conftest import csrf_post`, instead of `client.post(...)`. It writes a fresh token into the session and sends it with the form. Only call `client.post` directly in a test that deliberately checks that a missing or wrong token is refused.
+
+**Approved exceptions to "set up only through routes"** (Spec 10, FR8.3 and FR8.4): a test may call `db.seed_db()` on the throwaway database to create the demo user `demo@spendly.com` / `demo123`; may set a user's `created_at` with a direct `UPDATE` through `db.get_db()`; and may monkeypatch `app.today_ist` (not `db.today_ist`) to fake today's date in India. Import `today_ist` from `database.db` for date values instead of using `date.today()`.
+
 ## What to Test — Coverage Checklist
 For every feature, systematically cover:
 1. **Happy path**: correct input produces correct output/redirect/template

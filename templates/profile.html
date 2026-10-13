@@ -19,6 +19,10 @@
 
 <section class="profile-section">
 
+    {% if is_demo %}
+    <p class="range-note">You're using the shared demo account. Profile settings are locked — <a href="{{ url_for('register') }}">create your own free account</a> to try them.</p>
+    {% endif %}
+
     <div class="hand-drawn tilt-a">
         <svg preserveAspectRatio="none">
             <rect x="1%" y="4%" width="98%" height="90%" rx="10" fill="none" stroke="var(--ink)" stroke-width="1.7" filter="url(#hand-drawn)"></rect>
@@ -69,6 +73,7 @@
     {% macro budget_form() %}
     <p class="budget-tip">Your current budget is used for every month in a multi-month view.</p>
     <form method="POST" action="{{ url_for('save_budget') }}" class="budget-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="range" value="{{ active_range }}">
         {% if active_range == 'custom' %}
         <input type="hidden" name="start" value="{{ range_start.isoformat() }}">
@@ -287,6 +292,7 @@
         <div class="edit-profile-card">
             <h2 class="profile-card-title">Edit profile</h2>
             <form method="POST" action="{{ url_for('profile') }}" id="profile-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="form-group">
                     <label for="name">Full name</label>
                     <input type="text" id="name" name="name"
@@ -337,6 +343,7 @@
             </dl>
             <p class="delete-expense-warning">This can't be undone.</p>
             <form method="post" action="" id="delete-expense-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="range" value="{{ active_range }}">
                 {% if active_range == 'custom' %}
                 <input type="hidden" name="start" value="{{ range_start.isoformat() }}">

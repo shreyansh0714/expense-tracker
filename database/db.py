@@ -1,9 +1,18 @@
 import json
+import os
 import sqlite3
-from datetime import date
+from datetime import datetime, timedelta, timezone
 from werkzeug.security import generate_password_hash
 
-DB_PATH = "database.db"
+DB_PATH = os.environ.get("SPENDLY_DB", "database.db")
+
+# India Standard Time. A fixed offset is exact: IST has no daylight saving.
+IST = timezone(timedelta(hours=5, minutes=30))
+
+
+def today_ist():
+    """Today's date in India, whatever timezone the server runs in."""
+    return datetime.now(IST).date()
 
 
 def get_db():
@@ -73,6 +82,10 @@ def init_db():
         "UPDATE expenses SET updated_at = NULL WHERE updated_at IS NOT NULL "
         "AND id NOT IN (SELECT expense_id FROM expense_edits)"
     )
+    # Every dashboard query filters one user's expenses by date range.
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_expenses_user_date ON expenses(user_id, date)"
+    )
     conn.commit()
     conn.close()
 
@@ -91,7 +104,7 @@ def seed_db():
     )
     user_id = cur.lastrowid
 
-    today = date.today()
+    today = today_ist()
     sample_expenses = [
         (user_id, 45.50, "Food", today.replace(day=1).isoformat(), "Groceries"),
         (user_id, 12.00, "Transport", today.replace(day=3).isoformat(), "Bus pass"),

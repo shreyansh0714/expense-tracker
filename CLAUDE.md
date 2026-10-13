@@ -27,7 +27,7 @@ expense-tracker/
 │   ├── css/style.css         # Single stylesheet, CSS custom properties for design tokens
 │   └── js/main.js            # Vanilla JS, no build step, no framework
 ├── tests/
-│   ├── conftest.py           # shared fixtures: `client`/`auth_client` on a throwaway DB (never database.db)
+│   ├── conftest.py           # shared fixtures: `client`/`auth_client` on a throwaway DB (never database.db), plus `csrf_post`
 │   └── test_<spec-name>.py   # one file per spec, written by /test-feature
 └── .claude/
     ├── specs/                # one spec per step (/create-spec)
@@ -242,8 +242,9 @@ aren't reopened to add them):
   instead of guessing, and those lines are shown to the developer in the
   `/test-feature` report. Fix the spec, then re-run.
 - **Tests never touch the real `database.db`.** `tests/conftest.py`
-  swaps `database.db.DB_PATH` to a throwaway file per test (pytest's
-  `monkeypatch` + `tmp_path`) and provides the shared `client` and
+  sets `SPENDLY_DB` to a temp file before importing `app`, then
+  monkeypatches `DB_PATH` per test (pytest's `monkeypatch` +
+  `tmp_path`). It provides `csrf_post` for posting forms and the shared `client` and
   `auth_client` fixtures. Test files use these; they never define their own.
 - Alongside the checks, explicitly confirm the finished implementation
   matches what the developer actually asked for — not a feature Claude

@@ -152,6 +152,22 @@ a { color: inherit; text-decoration: none; }
 
 .nav-cta:hover { background: var(--accent) !important; }
 
+/* --- Nav logout button --- */
+/* "Sign out" is a POST form (CSRF-safe), styled to match the nav links. */
+.nav-logout { display: flex; margin: 0; }
+
+.nav-link-button {
+    background: none;
+    border: 0;
+    padding: 0;
+    font: inherit;
+    color: var(--ink-muted);
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.nav-link-button:hover { color: var(--ink); }
+
 /* ------------------------------------------------------------------ */
 /* Main                                                                */
 /* ------------------------------------------------------------------ */
@@ -1246,6 +1262,7 @@ textarea.form-input {
 }
 
 @media (max-width: 600px) {
-    .nav-links a:not(.nav-cta) { display: none; }
+    .nav-links a:not(.nav-cta),
+    .nav-links .nav-logout { display: none; }
     .hero { padding: 3rem 1rem 2rem; }
 }

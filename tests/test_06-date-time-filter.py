@@ -18,9 +18,11 @@ import sqlite3
 from datetime import date, timedelta
 
 import pytest
+from conftest import csrf_post
 
 from app import app as flask_app
 from database import db as db_module
+from database.db import today_ist
 
 # ------------------------------------------------------------------ #
 # Test-only DB + formatting helpers (not implementation code)         #
@@ -139,7 +141,8 @@ class TestAuthGuard:
         assert "/login" in resp.headers["Location"]
 
     def test_budget_post_requires_login(self, client):
-        resp = client.post(
+        resp = csrf_post(
+            client,
             "/profile/budget",
             data={"monthly_budget": "1000", "range": "this_month", "start": "", "end": ""},
         )
@@ -200,7 +203,7 @@ class TestFilterBarRendering:
         html = html_of(auth_client.get("/profile?range=last_3_months"))
         assert '<span class="range-pill">Last 3 months</span>' in html
 
-        d = date.today().isoformat()
+        d = today_ist().isoformat()
         html = html_of(auth_client.get(f"/profile?range=custom&start={d}&end={d}"))
         assert '<span class="range-pill">Custom range</span>' in html
 
@@ -218,7 +221,7 @@ class TestFilterBarRendering:
 class TestPresetRanges:
     def test_last_month_range_includes_only_previous_calendar_month(self, auth_client):
         user_id = get_user_id()
-        today = date.today()
+        today = today_ist()
         prev_start = first_of_previous_month(today)
         prev_end = last_of_previous_month(today)
         add_expense(user_id, 100, "Food", prev_start.isoformat(), "PREV-START")
@@ -235,7 +238,7 @@ class TestPresetRanges:
 
     def test_last_3_months_range_includes_expenses_from_two_months_back(self, auth_client):
         user_id = get_user_id()
-        today = date.today()
+        today = today_ist()
         range_start = first_of_month_n_back(today, 2)
         add_expense(user_id, 100, "Food", range_start.isoformat(), "IN-RANGE-START")
         add_expense(user_id, 110, "Food", today.isoformat(), "IN-RANGE-TODAY")
@@ -249,7 +252,7 @@ class TestPresetRanges:
     def test_all_time_range_includes_expenses_before_signup(self, auth_client):
         user_id = get_user_id()
         add_expense(user_id, 100, "Food", "2000-01-01", "ANCIENT")
-        add_expense(user_id, 110, "Food", date.today().isoformat(), "TODAY-EXP")
+        add_expense(user_id, 110, "Food", today_ist().isoformat(), "TODAY-EXP")
 
         html = html_of(auth_client.get("/profile?range=all_time"))
         assert "ANCIENT" in html, "AC5: all_time must include expenses dated before signup"
@@ -258,7 +261,7 @@ class TestPresetRanges:
 
     def test_start_end_params_ignored_when_range_is_a_preset(self, auth_client):
         user_id = get_user_id()
-        today = date.today()
+        today = today_ist()
         prev_start = first_of_previous_month(today)
         add_expense(user_id, 77, "Food", prev_start.isoformat(), "PREV-MONTH-ITEM")
 
@@ -276,8 +279,8 @@ class TestPresetRanges:
 class TestCustomRange:
     def test_custom_range_is_inclusive_on_both_ends(self, auth_client):
         user_id = get_user_id()
-        start = date.today() - timedelta(days=10)
-        end = date.today() - timedelta(days=5)
+        start = today_ist() - timedelta(days=10)
+        end = today_ist() - timedelta(days=5)
         add_expense(user_id, 50, "Food", start.isoformat(), "IN-START")
         add_expense(user_id, 60, "Food", end.isoformat(), "IN-END")
         add_expense(user_id, 70, "Food", (start - timedelta(days=1)).isoformat(), "OUT-BEFORE")
@@ -291,7 +294,7 @@ class TestCustomRange:
 
     def test_custom_range_single_day_is_valid(self, auth_client):
         user_id = get_user_id()
-        d = date.today() - timedelta(days=5)
+        d = today_ist() - timedelta(days=5)
         add_expense(user_id, 33, "Food", d.isoformat(), "SINGLE-DAY")
 
         html = html_of(auth_client.get(f"/profile?range=custom&start={d}&end={d}"))
@@ -300,7 +303,7 @@ class TestCustomRange:
 
     def test_recent_transactions_shows_at_most_5_newest_first(self, auth_client):
         user_id = get_user_id()
-        base = date.today() - timedelta(days=20)
+        base = today_ist() - timedelta(days=20)
         dates = [base + timedelta(days=i) for i in range(7)]
         for i, d in enumerate(dates):
             add_expense(user_id, 10 + i, "Food", d.isoformat(), f"TXN-{i}")
@@ -325,14 +328,15 @@ class TestCustomRange:
         # DB, separate cookie jar) so auth_client stays logged in as
         # test@example.com throughout.
         other_client = flask_app.test_client()
-        other_client.post(
+        csrf_post(
+            other_client,
             "/register",
             data={"name": "Other", "email": "other@example.com", "password": "testpass1"},
         )
         other_id = get_user_id("other@example.com")
-        add_expense(other_id, 5000, "Food", date.today().isoformat(), "OTHER-USER-EXPENSE")
+        add_expense(other_id, 5000, "Food", today_ist().isoformat(), "OTHER-USER-EXPENSE")
         my_id = get_user_id("test@example.com")
-        add_expense(my_id, 25, "Food", date.today().isoformat(), "MY-EXPENSE")
+        add_expense(my_id, 25, "Food", today_ist().isoformat(), "MY-EXPENSE")
 
         html = html_of(auth_client.get("/profile?range=all_time"))
         assert "MY-EXPENSE" in html
@@ -369,8 +373,8 @@ class TestValidationErrors:
         assert '<span class="range-pill">This month</span>' in html
 
     def test_future_start_date_shows_error_and_falls_back(self, auth_client):
-        future = (date.today() + timedelta(days=5)).isoformat()
-        far_future = (date.today() + timedelta(days=10)).isoformat()
+        future = (today_ist() + timedelta(days=5)).isoformat()
+        far_future = (today_ist() + timedelta(days=10)).isoformat()
         html = html_of(
             auth_client.get(f"/profile?range=custom&start={future}&end={far_future}")
         )
@@ -378,11 +382,11 @@ class TestValidationErrors:
         assert '<span class="range-pill">This month</span>' in html
 
     def test_end_in_future_start_in_past_clamps_to_today_without_error(self, auth_client):
-        start = date.today() - timedelta(days=10)
-        end = date.today() + timedelta(days=50)
+        start = today_ist() - timedelta(days=10)
+        end = today_ist() + timedelta(days=50)
         html = html_of(auth_client.get(f"/profile?range=custom&start={start}&end={end}"))
         assert "in the future" not in html.lower()
-        assert fmt(date.today()) in html, "the Showing line must end at today"
+        assert fmt(today_ist()) in html, "the Showing line must end at today"
 
 
 # ------------------------------------------------------------------ #
@@ -393,12 +397,12 @@ class TestValidationErrors:
 class TestHistoryStartAdjustment:
     def test_custom_range_before_history_start_shows_note_and_uses_history_start(self, auth_client):
         user_id = get_user_id()
-        history_start = date.today() - timedelta(days=30)
+        history_start = today_ist() - timedelta(days=30)
         add_expense(user_id, 250, "Food", history_start.isoformat(), "OLDEST")
         requested_start = history_start - timedelta(days=100)
 
         html = html_of(
-            auth_client.get(f"/profile?range=custom&start={requested_start}&end={date.today()}")
+            auth_client.get(f"/profile?range=custom&start={requested_start}&end={today_ist()}")
         )
         expected_note = f"Showing data from {fmt(history_start)}, when your records begin."
         assert expected_note in html
@@ -406,7 +410,7 @@ class TestHistoryStartAdjustment:
 
     def test_custom_range_entirely_before_history_start_shows_note_and_empty_state(self, auth_client):
         user_id = get_user_id()
-        history_start = date.today() - timedelta(days=30)
+        history_start = today_ist() - timedelta(days=30)
         add_expense(user_id, 250, "Food", history_start.isoformat(), "OLDEST")
         requested_start = history_start - timedelta(days=100)
         requested_end = history_start - timedelta(days=50)
@@ -437,7 +441,7 @@ class TestHistoryStartAdjustment:
         # month's displayed start silently moves to today (spec 06 FR6,
         # presets branch of case a) with no note shown.
         html = html_of(auth_client.get("/profile"))
-        today = date.today()
+        today = today_ist()
         expected = f"Showing {fmt(today)} – {fmt(today)}"
         assert expected in html
         assert "when your records begin" not in html
@@ -467,10 +471,10 @@ class TestEmptyStates:
     def test_empty_filtered_range_shows_no_expenses_between_message(self, auth_client):
         user_id = get_user_id()
         add_expense(
-            user_id, 40, "Food", (date.today() - timedelta(days=200)).isoformat(), "OLD-EXPENSE"
+            user_id, 40, "Food", (today_ist() - timedelta(days=200)).isoformat(), "OLD-EXPENSE"
         )
-        gap_start = date.today() - timedelta(days=100)
-        gap_end = date.today() - timedelta(days=90)
+        gap_start = today_ist() - timedelta(days=100)
+        gap_end = today_ist() - timedelta(days=90)
 
         html = html_of(
             auth_client.get(f"/profile?range=custom&start={gap_start}&end={gap_end}")
@@ -488,11 +492,12 @@ class TestEmptyStates:
 class TestBudgetSubtextAndTable:
     def test_single_month_range_shows_budget_subtext_not_table(self, auth_client):
         user_id = get_user_id()
-        auth_client.post(
+        csrf_post(
+            auth_client,
             "/profile/budget",
             data={"monthly_budget": "10000", "range": "this_month", "start": "", "end": ""},
         )
-        add_expense(user_id, 500, "Food", date.today().isoformat(), "SPEND")
+        add_expense(user_id, 500, "Food", today_ist().isoformat(), "SPEND")
 
         html = html_of(auth_client.get("/profile?range=this_month"))
         assert f"{money(500)} of {money(10000)} budget used" in html
@@ -500,11 +505,12 @@ class TestBudgetSubtextAndTable:
 
     def test_multi_month_range_hides_subtext_shows_budget_table(self, auth_client):
         user_id = get_user_id()
-        auth_client.post(
+        csrf_post(
+            auth_client,
             "/profile/budget",
             data={"monthly_budget": "10000", "range": "this_month", "start": "", "end": ""},
         )
-        today = date.today()
+        today = today_ist()
         month1_start = first_of_previous_month(today)
         add_expense(user_id, 300, "Food", month1_start.isoformat(), "PREV-MONTH-SPEND")
         add_expense(user_id, 400, "Food", today.isoformat(), "THIS-MONTH-SPEND")
@@ -534,7 +540,7 @@ class TestBudgetSubtextAndTable:
 
     def test_no_budget_set_shows_no_subtext_or_table_for_any_range(self, auth_client):
         user_id = get_user_id()
-        add_expense(user_id, 500, "Food", date.today().isoformat(), "SPEND")
+        add_expense(user_id, 500, "Food", today_ist().isoformat(), "SPEND")
 
         for query in ("range=this_month", "range=last_3_months"):
             html = html_of(auth_client.get(f"/profile?{query}"))
@@ -543,11 +549,12 @@ class TestBudgetSubtextAndTable:
 
     def test_zero_budget_shows_dash_percent_no_division_by_zero(self, auth_client):
         user_id = get_user_id()
-        auth_client.post(
+        csrf_post(
+            auth_client,
             "/profile/budget",
             data={"monthly_budget": "0", "range": "this_month", "start": "", "end": ""},
         )
-        today = date.today()
+        today = today_ist()
         prev_start = first_of_previous_month(today)
         add_expense(user_id, 50, "Food", prev_start.isoformat(), "X")
 
@@ -569,7 +576,8 @@ class TestBudgetBarControl:
         assert "Add monthly budget" in html
 
     def test_setting_budget_shows_amount_and_toast(self, auth_client):
-        resp = auth_client.post(
+        resp = csrf_post(
+            auth_client,
             "/profile/budget",
             data={"monthly_budget": "10,000", "range": "this_month", "start": "", "end": ""},
             follow_redirects=True,
@@ -582,11 +590,13 @@ class TestBudgetBarControl:
         assert get_monthly_budget() == 10000, "commas must be stripped before saving"
 
     def test_removing_budget_shows_add_control_again(self, auth_client):
-        auth_client.post(
+        csrf_post(
+            auth_client,
             "/profile/budget",
             data={"monthly_budget": "10000", "range": "this_month", "start": "", "end": ""},
         )
-        resp = auth_client.post(
+        resp = csrf_post(
+            auth_client,
             "/profile/budget",
             data={"monthly_budget": "", "range": "this_month", "start": "", "end": ""},
             follow_redirects=True,
@@ -599,11 +609,13 @@ class TestBudgetBarControl:
 
     @pytest.mark.parametrize("bad_value", ["-5", "abc"])
     def test_invalid_budget_input_leaves_budget_unchanged_and_errors(self, auth_client, bad_value):
-        auth_client.post(
+        csrf_post(
+            auth_client,
             "/profile/budget",
             data={"monthly_budget": "10000", "range": "this_month", "start": "", "end": ""},
         )
-        resp = auth_client.post(
+        resp = csrf_post(
+            auth_client,
             "/profile/budget",
             data={"monthly_budget": bad_value, "range": "this_month", "start": "", "end": ""},
             follow_redirects=True,
@@ -614,14 +626,16 @@ class TestBudgetBarControl:
         assert get_monthly_budget() == 10000, "an invalid value must not overwrite the saved budget"
 
     def test_budget_value_ignores_commas_and_spaces(self, auth_client):
-        auth_client.post(
+        csrf_post(
+            auth_client,
             "/profile/budget",
             data={"monthly_budget": " 10 000 ", "range": "this_month", "start": "", "end": ""},
         )
         assert get_monthly_budget() == 10000
 
     def test_budget_zero_is_a_valid_value(self, auth_client):
-        resp = auth_client.post(
+        resp = csrf_post(
+            auth_client,
             "/profile/budget",
             data={"monthly_budget": "0", "range": "this_month", "start": "", "end": ""},
             follow_redirects=True,
@@ -631,7 +645,8 @@ class TestBudgetBarControl:
         assert get_monthly_budget() == 0
 
     def test_budget_post_redirects_preserving_preset_range(self, auth_client):
-        resp = auth_client.post(
+        resp = csrf_post(
+            auth_client,
             "/profile/budget",
             data={"monthly_budget": "5000", "range": "last_3_months", "start": "", "end": ""},
         )
@@ -640,7 +655,8 @@ class TestBudgetBarControl:
 
     def test_budget_post_redirects_preserving_custom_start_end(self, auth_client):
         start, end = "2026-01-01", "2026-01-31"
-        resp = auth_client.post(
+        resp = csrf_post(
+            auth_client,
             "/profile/budget",
             data={"monthly_budget": "5000", "range": "custom", "start": start, "end": end},
         )
@@ -666,7 +682,8 @@ class TestMoneyFormat:
         ],
     )
     def test_budget_amount_uses_indian_digit_grouping(self, auth_client, raw_value, expected):
-        resp = auth_client.post(
+        resp = csrf_post(
+            auth_client,
             "/profile/budget",
             data={"monthly_budget": raw_value, "range": "this_month", "start": "", "end": ""},
             follow_redirects=True,
@@ -690,11 +707,13 @@ class TestEditProfileInteraction:
         confirmed field names. This test therefore only asserts the
         budget-preservation invariant (spec 06 AC25), not a specific
         success status code for the save itself."""
-        auth_client.post(
+        csrf_post(
+            auth_client,
             "/profile/budget",
             data={"monthly_budget": "7000", "range": "this_month", "start": "", "end": ""},
         )
-        resp = auth_client.post(
+        resp = csrf_post(
+            auth_client,
             "/profile", data={"email": "test@example.com", "notes": "updated via test"}
         )
         assert resp.status_code in (200, 302), "editing the profile popup must not error"

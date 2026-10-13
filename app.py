@@ -1,12 +1,16 @@
+import hmac
 import math
 import os
+import secrets
 import sqlite3
 from datetime import date, datetime, timedelta, timezone
+from urllib.parse import urlparse
 
 from flask import Flask, abort, flash, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash
 
 from database.db import (
+    IST,
     create_user,
     delete_expense as db_delete_expense,
     get_category_totals,
@@ -22,17 +26,59 @@ from database.db import (
     init_db,
     insert_expense,
     seed_db,
+    today_ist,
     update_expense,
     update_monthly_budget,
     update_user,
 )
 
 app = Flask(__name__)
+
+# Railway sets RAILWAY_ENVIRONMENT on every deploy; locally it is unset.
+IS_PRODUCTION = bool(os.environ.get("RAILWAY_ENVIRONMENT"))
+if IS_PRODUCTION and not os.environ.get("SECRET_KEY"):
+    raise RuntimeError("SECRET_KEY must be set in production")
 app.secret_key = os.environ.get("SECRET_KEY") or os.urandom(24)
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=IS_PRODUCTION,  # local dev runs on plain http://
+)
 
 with app.app_context():
     init_db()
     seed_db()
+
+
+# ------------------------------------------------------------------ #
+# CSRF protection                                                     #
+# ------------------------------------------------------------------ #
+
+def csrf_token():
+    """This session's form token, created the first time a page needs it."""
+    return session.setdefault("csrf_token", secrets.token_hex(32))
+
+
+@app.context_processor
+def inject_csrf_token():
+    return {"csrf_token": csrf_token}
+
+
+@app.before_request
+def check_csrf_token():
+    if request.method != "POST":
+        return None
+    sent = request.form.get("csrf_token", "")
+    expected = session.get("csrf_token", "")
+    if expected and hmac.compare_digest(sent, expected):
+        return None
+    flash("Your form expired. Please try again.", "error")
+    # Only send the user back to a page on this site; a forged request's
+    # Referer is the attacker's page, which must never be a redirect target.
+    referrer = request.referrer or ""
+    if urlparse(referrer).netloc == request.host:
+        return redirect(referrer)
+    return redirect(url_for("landing"))
 
 
 # ------------------------------------------------------------------ #
@@ -61,8 +107,8 @@ def format_day(d):
 
 @app.template_filter("local_time")
 def local_time(utc_text):
-    """SQLite's UTC '2026-09-22 19:39:21' -> '23 Sep 2026, 1:09 AM' in this computer's time zone."""
-    dt = datetime.strptime(utc_text, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc).astimezone()
+    """SQLite's UTC '2026-09-22 19:39:21' -> '23 Sep 2026, 1:09 AM' in India time (IST)."""
+    dt = datetime.strptime(utc_text, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc).astimezone(IST)
     return f"{format_day(dt)}, {dt.strftime('%I:%M %p').lstrip('0')}"
 
 
@@ -93,6 +139,9 @@ DATE_RANGES = {
 
 EXPENSE_CATEGORIES = ["Food", "Transport", "Bills", "Health", "Entertainment", "Shopping", "Other"]
 MAX_EXPENSE_AMOUNT = 10_000_000  # ₹1 crore
+# The shared demo account: visitors may use its expenses and budget, but not
+# change its profile (name, email, password, notes).
+DEMO_EMAIL = "demo@spendly.com"
 
 
 def resolve_date_range(args, history_start, today):
@@ -273,7 +322,9 @@ def register():
             email=email,
         )
 
+    session.clear()
     session["user_id"] = user_id
+    session.permanent = True
     return redirect(url_for("profile"))
 
 
@@ -291,14 +342,15 @@ def login():
             "login.html", error="Invalid email or password.", email=email
         )
 
+    session.clear()
     session["user_id"] = user["id"]
     session.permanent = True
     return redirect(url_for("profile"))
 
 
-@app.route("/logout")
+@app.route("/logout", methods=["POST"])
 def logout():
-    session.pop("user_id", None)
+    session.clear()
     return redirect(url_for("landing"))
 
 
@@ -322,7 +374,7 @@ def analytics():
 
 
 # ------------------------------------------------------------------ #
-# Placeholder routes — students will implement these                  #
+# Profile, budget and expense routes                                 #
 # ------------------------------------------------------------------ #
 
 @app.route("/profile", methods=["GET", "POST"])
@@ -332,14 +384,17 @@ def profile():
         return redirect(url_for("login"))
 
     user = get_user_by_id(session["user_id"])
-    created_at = datetime.strptime(user["created_at"], "%Y-%m-%d %H:%M:%S")
+    # created_at is stored in UTC; the signup day is the day in India.
+    created_at = datetime.strptime(user["created_at"], "%Y-%m-%d %H:%M:%S").replace(
+        tzinfo=timezone.utc
+    ).astimezone(IST)
     history_start = created_at.date()
     first_expense_date = get_first_expense_date(user["id"])
     if first_expense_date:
         history_start = min(history_start, date.fromisoformat(first_expense_date))
 
     active_range, range_start, range_end, range_note, filter_error = resolve_date_range(
-        request.args, history_start, date.today()
+        request.args, history_start, today_ist()
     )
     category_totals = get_category_totals(user["id"], range_start, range_end)
     budget = user["monthly_budget"]
@@ -382,9 +437,11 @@ def profile():
         "filter_error": filter_error,
         "show_budget_subtext": budget is not None and single_month,
         "monthly_budget_rows": monthly_budget_rows,
-        "today": date.today(),
+        "today": today_ist(),
         "new_expense_id": session.pop("new_expense_id", None),
     }
+
+    is_demo = user["email"] == DEMO_EMAIL
 
     if request.method == "GET":
         return render_template(
@@ -392,8 +449,17 @@ def profile():
             name=user["name"],
             email=user["email"],
             notes=user["notes"] or "",
+            is_demo=is_demo,
             **dashboard,
         )
+
+    if is_demo:
+        flash(
+            "The demo account's profile can't be changed. "
+            "Create your own free account to try this.",
+            "error",
+        )
+        return redirect(url_for("profile"))
 
     name = request.form.get("name", "").strip()
     email = request.form.get("email", "").strip()
@@ -501,7 +567,7 @@ def add_expense():
         return redirect(url_for("login"))
 
     user = get_user_by_id(session["user_id"])
-    today = date.today()
+    today = today_ist()
     page = expense_page_context(user, today)
 
     if request.method == "GET":
@@ -550,7 +616,7 @@ def edit_expense(id):
     # Cancel, both redirects and the Back-arrow bounce (main.js) all return to this row.
     back_to = url_for("profile", _anchor=f"expense-{id}", **filter_args)
     user = get_user_by_id(session["user_id"])
-    today = date.today()
+    today = today_ist()
     page = expense_page_context(user, today)
 
     if request.method == "GET":
