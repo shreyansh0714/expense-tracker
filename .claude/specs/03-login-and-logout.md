@@ -28,7 +28,7 @@ a user would discover `/logout` exists.
     restarts, and redirect to `url_for("profile")` — same post-auth
     destination `register()` already uses (profile itself stays the
     Step 4 stub; landing there is expected and unchanged by this step).
-- `GET /logout` — clears the session (`session.pop("user_id", None)`)
+- `POST /logout` — clears the session (`session.clear()`); needs a valid CSRF token, and `GET /logout` now returns 405 (superseded by Spec 10)
   and redirects to `url_for("landing")`. No confirmation step. Works
   whether or not a session currently exists (clearing a session that
   isn't there is a no-op, not an error).
@@ -49,8 +49,8 @@ a user would discover `/logout` exists.
   - Success: `302` redirect to `/profile` (via `url_for("profile")`),
     with `session["user_id"]` set and `session.permanent = True`.
 
-**`GET /logout`**
-- Input: none.
+**`POST /logout`** (superseded by Spec 10)
+- Input: form field `csrf_token`. (`GET /logout` returns 405.)
 - Output: `302` redirect to `/` (`url_for("landing")`). Session cleared
   as a side effect.
 
@@ -162,9 +162,8 @@ a user would discover `/logout` exists.
   inputs (client-side), but a direct POST (e.g. via curl) with a blank
   field should still fail gracefully — `get_user_by_email("")` returns
   `None` → same generic error, not a 500.
-- **`/logout` called with no active session**: `session.pop("user_id",
-  None)` is a no-op if the key isn't present — still redirects to
-  landing, no error.
+- **`/logout` called with no active session**: `session.clear()` is a no-op
+  on an empty session — still redirects to landing, no error. (superseded by Spec 10)
 - **Already-logged-in user visits `/login` (GET)**: out of scope for
   this step — renders the login form as normal, no redirect-if-already-
   authenticated behavior. (Not requested; would be scope creep.)
@@ -185,10 +184,10 @@ a user would discover `/logout` exists.
       same generic error message (not a different one).
 - [ ] After a successful login, `session["user_id"]` is set and
       `session.permanent` is `True`.
-- [ ] `GET /logout` while logged in clears the session and redirects to
-      `/`.
-- [ ] `GET /logout` while already logged out redirects to `/` without
-      raising an error.
+- [ ] `POST /logout` (with a valid CSRF token) while logged in clears the
+      session and redirects to `/`. (superseded by Spec 10)
+- [ ] `POST /logout` while already logged out redirects to `/` without
+      raising an error. (superseded by Spec 10)
 - [ ] Nav bar shows "Sign out" instead of "Sign in"/"Get started" when
       `session.user_id` is set, and reverts after logout.
 - [ ] `login.html`'s form posts to `{{ url_for('login') }}`, not a
@@ -203,7 +202,7 @@ a user would discover `/logout` exists.
    should redirect to `/profile` (the Step 4 stub string is expected —
    that's fine, it confirms the redirect happened) and the nav bar
    (visit `/` next) should now show "Sign out" instead of "Sign in".
-3. Click "Sign out" (or visit `/logout` directly) → should land back on
+3. Click the "Sign out" button (superseded by Spec 10) → should land back on
    `/` with the nav bar showing "Sign in"/"Get started" again.
 4. Visit `/login` again and submit a wrong password for
    `demo@spendly.com` → should see `"Invalid email or password."` on

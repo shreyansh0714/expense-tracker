@@ -45,6 +45,7 @@
             {% else %}
             <form method="POST" action="{{ url_for('add_expense') }}">
             {% endif %}
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 {% if expense %}
                 {% for key, value in filter_args.items() %}
                 <input type="hidden" name="{{ key }}" value="{{ value }}">

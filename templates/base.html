@@ -29,7 +29,10 @@
                 <a href="{{ url_for('profile') }}"{% if request.endpoint == 'profile' %} class="nav-active"{% endif %}>Profile</a>
                 <a href="{{ url_for('analytics') }}"{% if request.endpoint == 'analytics' %} class="nav-active"{% endif %}>Analytics</a>
                 <a href="{{ url_for('add_expense') }}"{% if request.endpoint == 'add_expense' %} class="nav-active"{% endif %}>Add expense</a>
-                <a href="{{ url_for('logout') }}">Sign out</a>
+                <form method="post" action="{{ url_for('logout') }}" class="nav-logout">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="nav-link-button">Sign out</button>
+                </form>
                 {% else %}
                 <a href="{{ url_for('login') }}">Sign in</a>
                 <a href="{{ url_for('register') }}" class="nav-cta">Get started</a>

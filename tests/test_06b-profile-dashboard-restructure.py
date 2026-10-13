@@ -22,7 +22,9 @@ import sqlite3
 from datetime import date, timedelta
 
 from app import app as flask_app
+from conftest import csrf_post
 from database import db as db_module
+from database.db import today_ist
 
 # ------------------------------------------------------------------ #
 # Test-only DB + formatting helpers (not implementation code)         #
@@ -173,11 +175,12 @@ class TestBlockOrder:
 
     def test_budget_table_renders_after_content_grid_when_present(self, auth_client):
         user_id = get_user_id()
-        auth_client.post(
+        csrf_post(
+            auth_client,
             "/profile/budget",
             data={"monthly_budget": "10000", "range": "this_month", "start": "", "end": ""},
         )
-        today = date.today()
+        today = today_ist()
         month1_start = first_of_previous_month(today)
         add_expense(user_id, 300, "Food", month1_start.isoformat(), "PREV-MONTH-SPEND")
         add_expense(user_id, 400, "Food", today.isoformat(), "THIS-MONTH-SPEND")
@@ -218,7 +221,7 @@ class TestDateFilterCustomBoxes:
         # day equal to today is the one custom range guaranteed not to
         # trigger a history-start note or a future-date error, keeping this
         # test focused only on AC3 (input echo), not FR6 adjustment.
-        d = date.today().isoformat()
+        d = today_ist().isoformat()
         html = html_of(auth_client.get(f"/profile?range=custom&start={d}&end={d}"))
         filter_html = date_filter_custom_slice(html)
         assert filter_html.count(f'value="{d}"') == 2, (
@@ -254,7 +257,8 @@ class TestRangeBudgetBar:
         )
 
     def test_budget_set_shows_amount_and_edit_hides_add_control(self, auth_client):
-        auth_client.post(
+        csrf_post(
+            auth_client,
             "/profile/budget",
             data={"monthly_budget": "10000", "range": "this_month", "start": "", "end": ""},
         )
@@ -294,13 +298,13 @@ class TestFilterErrorAndRangeNotePlacement:
 
     def test_range_note_renders_between_bar_and_stat_tiles(self, auth_client):
         user_id = get_user_id()
-        history_start = date.today() - timedelta(days=30)
+        history_start = today_ist() - timedelta(days=30)
         add_expense(user_id, 250, "Food", history_start.isoformat(), "OLDEST")
         requested_start = history_start - timedelta(days=100)
 
         html = html_of(
             auth_client.get(
-                f"/profile?range=custom&start={requested_start}&end={date.today()}"
+                f"/profile?range=custom&start={requested_start}&end={today_ist()}"
             )
         )
         bar_idx = html.index("range-budget-bar")
@@ -350,10 +354,10 @@ class TestEmptyStates:
     def test_expenses_exist_but_range_empty_shows_message_in_both_cards(self, auth_client):
         user_id = get_user_id()
         add_expense(
-            user_id, 40, "Food", (date.today() - timedelta(days=200)).isoformat(), "OLD-EXPENSE"
+            user_id, 40, "Food", (today_ist() - timedelta(days=200)).isoformat(), "OLD-EXPENSE"
         )
-        gap_start = date.today() - timedelta(days=100)
-        gap_end = date.today() - timedelta(days=90)
+        gap_start = today_ist() - timedelta(days=100)
+        gap_end = today_ist() - timedelta(days=90)
 
         html = html_of(
             auth_client.get(f"/profile?range=custom&start={gap_start}&end={gap_end}")
@@ -381,7 +385,7 @@ class TestEmptyStates:
         rather than hardcoding specific date values for this branch.
         """
         user_id = get_user_id()
-        history_start = date.today() - timedelta(days=30)
+        history_start = today_ist() - timedelta(days=30)
         add_expense(user_id, 250, "Food", history_start.isoformat(), "OLDEST")
         requested_start = history_start - timedelta(days=100)
         requested_end = history_start - timedelta(days=50)

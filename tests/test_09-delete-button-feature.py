@@ -18,9 +18,14 @@ import inspect
 from urllib.parse import parse_qs, urlparse
 
 import pytest
+from conftest import csrf_post
 
 from app import app as flask_app
 from database import db
+
+# Expenses are dated today (in IST) so they fall inside /profile's default
+# "This month" range on any day the suite runs.
+TODAY = db.today_ist().isoformat()
 
 
 # --------------------------------------------------------------------- #
@@ -91,11 +96,12 @@ def _register_and_login(email):
     """A second, independent logged-in client on the same throwaway DB
     (used for the "own expenses only" ownership check, AC14)."""
     second = flask_app.test_client()
-    second.post(
+    csrf_post(
+        second,
         "/register",
         data={"name": "Second User", "email": email, "password": "testpass1"},
     )
-    second.post("/login", data={"email": email, "password": "testpass1"})
+    csrf_post(second, "/login", data={"email": email, "password": "testpass1"})
     return second
 
 
@@ -107,9 +113,10 @@ class TestDeleteHappyPath:
     def test_delete_own_expense_redirects_and_keeps_range_filter(self, auth_client):
         # Spec section 10, minimum test 1.
         user_id = _user_id("test@example.com")
-        expense_id = _insert_expense(user_id, 100, "Food", "Tea", "2026-09-22")
+        expense_id = _insert_expense(user_id, 100, "Food", "Tea", TODAY)
 
-        response = auth_client.post(
+        response = csrf_post(
+            auth_client,
             f"/expenses/{expense_id}/delete",
             data={"range": "last_3_months"},
         )
@@ -123,9 +130,10 @@ class TestDeleteHappyPath:
 
     def test_delete_success_shows_toast_and_removes_row_from_db(self, auth_client):
         user_id = _user_id("test@example.com")
-        expense_id = _insert_expense(user_id, 250, "Transport", "", "2026-09-22")
+        expense_id = _insert_expense(user_id, 250, "Transport", "", TODAY)
 
-        response = auth_client.post(
+        response = csrf_post(
+            auth_client,
             f"/expenses/{expense_id}/delete",
             data={"range": "last_3_months"},
             follow_redirects=True,
@@ -142,9 +150,10 @@ class TestDeleteHappyPath:
         # is sent in this case, mirroring how the budget form only sends the
         # filter keys that are actually set — FR14).
         user_id = _user_id("test@example.com")
-        expense_id = _insert_expense(user_id, 40, "Other", "filter-test", "2026-09-22")
+        expense_id = _insert_expense(user_id, 40, "Other", "filter-test", TODAY)
 
-        response = auth_client.post(
+        response = csrf_post(
+            auth_client,
             f"/expenses/{expense_id}/delete",
             data={"start": "2026-09-01", "end": "2026-09-30"},
         )
@@ -162,8 +171,8 @@ class TestDeleteHappyPath:
         # since the spec doesn't give the exact markup/selector for the
         # Total Spent / Transactions tiles (SPEC GAP, see final report).
         user_id = _user_id("test@example.com")
-        _insert_expense(user_id, 100, "Food", "Tea", "2026-09-22")
-        deleted_id = _insert_expense(user_id, 250, "Transport", "", "2026-09-22")
+        _insert_expense(user_id, 100, "Food", "Tea", TODAY)
+        deleted_id = _insert_expense(user_id, 250, "Transport", "", TODAY)
 
         def totals():
             conn = db.get_db()
@@ -177,7 +186,7 @@ class TestDeleteHappyPath:
             return row[0], row[1]
 
         count_before, sum_before = totals()
-        auth_client.post(f"/expenses/{deleted_id}/delete", data={"range": "this_month"})
+        csrf_post(auth_client, f"/expenses/{deleted_id}/delete", data={"range": "this_month"})
         count_after, sum_after = totals()
 
         assert count_after == count_before - 1, "AC10: Transactions count must drop by one"
@@ -186,9 +195,10 @@ class TestDeleteHappyPath:
     def test_delete_last_expense_shows_empty_state(self, auth_client):
         # AC16
         user_id = _user_id("test@example.com")
-        expense_id = _insert_expense(user_id, 40, "Other", "only one", "2026-09-22")
+        expense_id = _insert_expense(user_id, 40, "Other", "only one", TODAY)
 
-        response = auth_client.post(
+        response = csrf_post(
+            auth_client,
             f"/expenses/{expense_id}/delete",
             data={"range": "this_month"},
             follow_redirects=True,
@@ -208,10 +218,10 @@ class TestDeleteGuardsAndErrors:
     def test_delete_same_expense_twice_returns_404_second_time(self, auth_client):
         # Spec section 10, minimum test 2 / AC15.
         user_id = _user_id("test@example.com")
-        expense_id = _insert_expense(user_id, 40, "Other", "twice", "2026-09-22")
+        expense_id = _insert_expense(user_id, 40, "Other", "twice", TODAY)
 
-        first = auth_client.post(f"/expenses/{expense_id}/delete", data={"range": "this_month"})
-        second = auth_client.post(f"/expenses/{expense_id}/delete", data={"range": "this_month"})
+        first = csrf_post(auth_client, f"/expenses/{expense_id}/delete", data={"range": "this_month"})
+        second = csrf_post(auth_client, f"/expenses/{expense_id}/delete", data={"range": "this_month"})
 
         assert first.status_code == 302, "the first delete should succeed"
         assert second.status_code == 404, "AC15: deleting the same id twice returns 404 the second time"
@@ -219,7 +229,7 @@ class TestDeleteGuardsAndErrors:
     def test_get_to_delete_route_returns_405(self, auth_client):
         # Spec section 10, minimum test 3 / AC12 / FR10.
         user_id = _user_id("test@example.com")
-        expense_id = _insert_expense(user_id, 40, "Other", "get-test", "2026-09-22")
+        expense_id = _insert_expense(user_id, 40, "Other", "get-test", TODAY)
 
         response = auth_client.get(f"/expenses/{expense_id}/delete")
 
@@ -228,7 +238,7 @@ class TestDeleteGuardsAndErrors:
 
     def test_delete_route_with_non_int_id_returns_404(self, auth_client):
         # APIs table: `/expenses/<non-int>/delete` → 404 (Flask's int converter).
-        response = auth_client.post("/expenses/not-an-id/delete", data={"range": "this_month"})
+        response = csrf_post(auth_client, "/expenses/not-an-id/delete", data={"range": "this_month"})
         assert response.status_code == 404
 
     def test_signed_out_post_redirects_to_login_and_deletes_nothing(self, client):
@@ -236,15 +246,16 @@ class TestDeleteGuardsAndErrors:
         # Register signs the client in (Step 2), so log back out afterward —
         # the spec's own AC11 manual step starts with "Click Sign out" — to
         # get a genuinely signed-out client that still owns the expense.
-        client.post(
+        csrf_post(
+            client,
             "/register",
             data={"name": "Owner", "email": "owner@example.com", "password": "testpass1"},
         )
-        client.get("/logout")
+        csrf_post(client, "/logout")
         owner_id = _user_id("owner@example.com")
-        expense_id = _insert_expense(owner_id, 40, "Other", "signed-out-test", "2026-09-22")
+        expense_id = _insert_expense(owner_id, 40, "Other", "signed-out-test", TODAY)
 
-        response = client.post(f"/expenses/{expense_id}/delete", data={"range": "this_month"})
+        response = csrf_post(client, f"/expenses/{expense_id}/delete", data={"range": "this_month"})
 
         assert response.status_code == 302, "FR11: signed-out delete must redirect"
         location = urlparse(response.headers["Location"])
@@ -258,16 +269,17 @@ class TestDeleteGuardsAndErrors:
 
     def test_delete_nonexistent_id_returns_404(self, auth_client):
         # Spec section 10, minimum test (also AC13).
-        response = auth_client.post("/expenses/999999/delete", data={"range": "this_month"})
+        response = csrf_post(auth_client, "/expenses/999999/delete", data={"range": "this_month"})
         assert response.status_code == 404
 
     def test_delete_another_users_expense_returns_404_and_row_survives(self, auth_client):
         # Spec section 10, minimum test 5 / AC14.
         second = _register_and_login("userb@example.com")
         other_user_id = _user_id("userb@example.com")
-        other_expense_id = _insert_expense(other_user_id, 500, "Other", "not yours", "2026-09-22")
+        other_expense_id = _insert_expense(other_user_id, 500, "Other", "not yours", TODAY)
 
-        response = auth_client.post(
+        response = csrf_post(
+            auth_client,
             f"/expenses/{other_expense_id}/delete", data={"range": "this_month"}
         )
 
@@ -282,12 +294,13 @@ class TestDeleteGuardsAndErrors:
 
 class TestDeleteExpenseDbHelper:
     def test_delete_expense_returns_true_and_removes_own_row(self, client):
-        client.post(
+        csrf_post(
+            client,
             "/register",
             data={"name": "Owner", "email": "owner2@example.com", "password": "testpass1"},
         )
         user_id = _user_id("owner2@example.com")
-        expense_id = _insert_expense(user_id, 10, "Other", "helper-test", "2026-09-22")
+        expense_id = _insert_expense(user_id, 10, "Other", "helper-test", TODAY)
 
         result = db.delete_expense(user_id, expense_id)
 
@@ -295,17 +308,19 @@ class TestDeleteExpenseDbHelper:
         assert _expense_count(expense_id) == 0
 
     def test_delete_expense_returns_false_for_wrong_user(self, client):
-        client.post(
+        csrf_post(
+            client,
             "/register",
             data={"name": "Owner", "email": "owner3@example.com", "password": "testpass1"},
         )
-        client.post(
+        csrf_post(
+            client,
             "/register",
             data={"name": "Intruder", "email": "intruder@example.com", "password": "testpass1"},
         )
         owner_id = _user_id("owner3@example.com")
         intruder_id = _user_id("intruder@example.com")
-        expense_id = _insert_expense(owner_id, 10, "Other", "helper-test", "2026-09-22")
+        expense_id = _insert_expense(owner_id, 10, "Other", "helper-test", TODAY)
 
         result = db.delete_expense(intruder_id, expense_id)
 
@@ -313,7 +328,8 @@ class TestDeleteExpenseDbHelper:
         assert _expense_count(expense_id) == 1
 
     def test_delete_expense_returns_false_for_missing_id(self, client):
-        client.post(
+        csrf_post(
+            client,
             "/register",
             data={"name": "Owner", "email": "owner4@example.com", "password": "testpass1"},
         )
@@ -332,7 +348,7 @@ class TestProfileMarkup:
     def test_row_has_aria_label_and_data_action(self, auth_client):
         # Spec section 10, minimum test 6 / AC1 / AC2.
         user_id = _user_id("test@example.com")
-        expense_id = _insert_expense(user_id, 100, "Food", "Tea", "2026-09-22")
+        expense_id = _insert_expense(user_id, 100, "Food", "Tea", TODAY)
 
         response = auth_client.get("/profile")
         html = response.data.decode()
@@ -346,11 +362,11 @@ class TestProfileMarkup:
     def test_row_data_attributes_match_row_values(self, auth_client):
         # AC2
         user_id = _user_id("test@example.com")
-        _insert_expense(user_id, 100, "Food", "Tea", "2026-09-22")
+        _insert_expense(user_id, 100, "Food", "Tea", TODAY)
 
         html = auth_client.get("/profile").data.decode()
 
-        assert 'data-date="2026-09-22"' in html
+        assert f'data-date="{TODAY}"' in html
         assert 'data-description="Tea"' in html
         assert 'data-category="Food"' in html
         assert 'data-amount="' in html and "100" in html
@@ -358,7 +374,7 @@ class TestProfileMarkup:
     def test_row_data_description_defaults_to_dash_when_empty(self, auth_client):
         # AC2: "data-description is — when the description is empty."
         user_id = _user_id("test@example.com")
-        _insert_expense(user_id, 250, "Transport", "", "2026-09-22")
+        _insert_expense(user_id, 250, "Transport", "", TODAY)
 
         html = auth_client.get("/profile").data.decode()
 
@@ -381,7 +397,7 @@ class TestProfileMarkup:
     def test_delete_modal_contains_expected_static_content(self, auth_client):
         # FR5 / AC3: heading, "can't be undone" line, Cancel + Delete buttons.
         user_id = _user_id("test@example.com")
-        _insert_expense(user_id, 100, "Food", "Tea", "2026-09-22")
+        _insert_expense(user_id, 100, "Food", "Tea", TODAY)
 
         html = auth_client.get("/profile").data.decode()
 
@@ -397,7 +413,7 @@ class TestProfileMarkup:
         # so a browser never parses it as markup; the JS textContent behaviour
         # itself is not exercisable via the Flask test client (see report).
         user_id = _user_id("test@example.com")
-        _insert_expense(user_id, 40, "Other", "<b>x</b>", "2026-09-22")
+        _insert_expense(user_id, 40, "Other", "<b>x</b>", TODAY)
 
         html = auth_client.get("/profile").data.decode()
 
